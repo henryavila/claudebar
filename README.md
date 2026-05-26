@@ -49,10 +49,21 @@ If you prefer not to run the installer:
 ./test/portability.sh
 ```
 
-## Rollback
+## Uninstall
 
 ```bash
-cp ~/.claude/settings.json.bak-<TIMESTAMP> ~/.claude/settings.json
+~/.claude/statusline/uninstall.sh
 ```
 
-(Backup created automatically by the installer with timestamp suffix.)
+Lists every backup `install.sh` created (one per install run), defaults to the most recent, restores the prior `~/.claude/settings.json`, and snapshots the current state first in case you change your mind. Files in `~/.claude/statusline/` are left in place — delete with `rm -rf ~/.claude/statusline` once you're sure.
+
+To re-enable later: `~/.claude/statusline/install.sh`.
+
+### Manual rollback
+
+If `uninstall.sh` doesn't work for some reason, restore by hand:
+
+```bash
+ls ~/.claude/settings.json.bak-*       # see all backups
+cp ~/.claude/settings.json.bak-<TIMESTAMP> ~/.claude/settings.json
+```

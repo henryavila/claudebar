@@ -4,6 +4,14 @@
 
 (nothing yet)
 
+## v1.2.0 — 2026-05-26
+
+- Add `uninstall.sh` to disable the statusline by restoring a prior backup
+- Lists all install-time backups, defaults to most recent, lets user pick interactively if multiple
+- Snapshots current state as `settings.json.before-uninstall-<ts>` in case user wants to redo
+- Validates restored JSON via jq when available; warns (not errors) if jq absent
+- Files in `~/.claude/statusline/` are left in place; uninstall prints exact `rm -rf` command for full removal
+
 ## v1.1.0 — 2026-05-26
 
 - Add `install.sh` for plug-and-play setup on macOS, native Ubuntu/Debian/Arch/Fedora, and WSL
