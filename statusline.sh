@@ -83,6 +83,19 @@ now_epoch() {
     date +%s
 }
 
+# ─── detect_layout — return "compact" or "full" based on environment ──
+detect_layout() {
+    case "${CLAUDEBAR_LAYOUT:-}" in
+        compact) echo compact; return ;;
+        full)    echo full;    return ;;
+    esac
+    [[ "${MOSHI_CLIENT:-}" == "1" ]] && { echo compact; return; }
+    local cols=${COLUMNS:-0}
+    (( cols == 0 )) && cols=$(tput cols 2>/dev/null || echo 80)
+    (( cols < 60 )) && { echo compact; return; }
+    echo full
+}
+
 # ─── format_countdown SECONDS — magnitude-aware time-until string ──────
 # Returns a 3-6 char ASCII string:
 #   s < 60                 → "now"
