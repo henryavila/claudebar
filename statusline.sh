@@ -62,17 +62,81 @@ zone_color() {
     fi
 }
 
-# ─── pip_bar PCT — render 10-pip zone-colored bar ─────────────────────
+# ─── now_epoch — current Unix timestamp, overridable for deterministic tests
+# Returns $CLAUDEBAR_NOW_FOR_TESTING if it's a positive integer; otherwise
+# defaults to `date +%s`. Empty / non-numeric override falls back defensively
+# so a typo in test setup never poisons real renders.
+now_epoch() {
+    local v=${CLAUDEBAR_NOW_FOR_TESTING:-}
+    if [[ "$v" =~ ^[0-9]+$ ]]; then
+        printf '%s' "$v"
+        return
+    fi
+    date +%s
+}
+
+# ─── format_countdown SECONDS — magnitude-aware time-until string ──────
+# Returns a 3-6 char ASCII string:
+#   s < 60                 → "now"
+#   60 ≤ s < 86400         → "XhYYm"   (X may be 0; minutes zero-padded)
+#   86400 ≤ s ≤ 2592000    → "XdYYh"   (hours zero-padded)
+#   s > 2592000            → "30d+"    (defensive cap)
+format_countdown() {
+    local s=$1
+    if (( s < 60 )); then
+        printf 'now'
+        return
+    fi
+    if (( s > 2592000 )); then
+        printf '30d+'
+        return
+    fi
+    if (( s >= 86400 )); then
+        printf '%dd%02dh' "$(( s / 86400 ))" "$(( (s % 86400) / 3600 ))"
+        return
+    fi
+    printf '%dh%02dm' "$(( s / 3600 ))" "$(( (s % 3600) / 60 ))"
+}
+
+# ─── pip_bar PCT [MARKER_POS] — render 10-pip zone-colored bar ────────
+# When MARKER_POS is a number in [0..10], a dim │ is inserted at that slot
+# (0 = before pip 0, N = between pip N-1 and pip N, 10 = after pip 9).
+# Used by the time-elapsed marker on the 5h/7d chips: when the fill edge
+# and the marker disagree, the chip visually communicates "you're burning
+# faster than the window allows" (pipe inside fill) or "you have margin"
+# (pipe past the fill edge). Empty/unset marker preserves the 10-char
+# legacy render.
 pip_bar() {
     local pct=$1
-    local color filled empty i
+    local marker=${2:-}
+    local color filled i
     color=$(zone_color "$pct")
     filled=$(( pct * 10 / 100 ))
     (( filled > 10 )) && filled=10
     (( filled < 0 ))  && filled=0
-    empty=$(( 10 - filled ))
-    for ((i=0; i<filled; i++)); do fg "$color" "▰"; done
-    for ((i=0; i<empty;  i++)); do fg "$C_BAR_DIM" "▱"; done
+
+    # Normalize / clamp marker to [0, 10] when numeric; treat anything else
+    # (empty, negative-string, non-digit) as "no marker".
+    local marker_active=0
+    if [[ "$marker" =~ ^-?[0-9]+$ ]]; then
+        marker_active=1
+        (( marker < 0 ))  && marker=0
+        (( marker > 10 )) && marker=10
+    fi
+
+    for ((i=0; i<10; i++)); do
+        if (( marker_active && marker == i )); then
+            fg "$C_REPO" "│"
+        fi
+        if (( i < filled )); then
+            fg "$color" "▰"
+        else
+            fg "$C_BAR_DIM" "▱"
+        fi
+    done
+    if (( marker_active && marker == 10 )); then
+        fg "$C_REPO" "│"
+    fi
 }
 
 # ─── tmux_chip — show tmux session:window.pane when inside tmux ────────
