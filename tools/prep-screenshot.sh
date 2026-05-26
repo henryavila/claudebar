@@ -34,6 +34,27 @@ set_cache() {
     touch "/tmp/statusline-git-${sid}"
 }
 
+# Render the bar with a MOCKED tmux command so the tmux chip always
+# appears in state 08, regardless of whether the user is in tmux when
+# running this script. Outputs synthetic session info "arch:1.2" so the
+# screenshot is reproducible on any machine.
+render_with_mock_tmux() {
+    local fixture=$1
+    local fake_dir
+    fake_dir=$(mktemp -d)
+    cat > "$fake_dir/tmux" <<'TMUX_MOCK_EOF'
+#!/bin/sh
+# Mock for screenshot demo: always returns synthetic session info.
+case "$*" in
+    *display-message*) echo "arch:1.2" ;;
+    *) exit 1 ;;
+esac
+TMUX_MOCK_EOF
+    chmod +x "$fake_dir/tmux"
+    TMUX="/mock/socket,0,0" PATH="$fake_dir:$PATH" "$script" < "$fixture"
+    rm -rf "$fake_dir"
+}
+
 declare -A LABELS=(
     [01-calm]="Calm start of session"
     [02-mid-session]="Mid-session - worktree work in progress"
@@ -79,14 +100,14 @@ render_one() {
     printf '   \e[38;5;238m-----------------------------------------\e[0m\n\n'
 
     if [[ "$state" == "08-with-tmux" ]]; then
-        # Render twice — without tmux vs with tmux — so the difference is
-        # unmistakable. The added chip is "tmux:session:window.pane" between
-        # the effort chip and the repo block.
+        # Render twice — without tmux vs with tmux (mocked) — so the
+        # difference is unmistakable AND reproducible regardless of whether
+        # the user is currently inside a real tmux session.
         printf '   \e[38;5;238m# WITHOUT tmux (baseline) — no extra chip after HIGH:\e[0m\n   '
         (unset TMUX; "$script" < "$fixture") | sed 's/^/   /'
         printf '\n\n'
         printf '   \e[38;5;238m# WITH tmux active — notice the new \e[38;5;105mtmux:...\e[0m\e[38;5;238m chip:\e[0m\n   '
-        "$script" < "$fixture" | sed 's/^/   /'
+        render_with_mock_tmux "$fixture" | sed 's/^/   /'
     else
         printf '   '
         (unset TMUX; "$script" < "$fixture") | sed 's/^/   /'
@@ -106,7 +127,8 @@ render_all() {
         set_cache "$fixture" "${DIRTY[$state]}"
         printf '\n  \e[1;38;5;245m-- %s. %s --\e[0m\n\n  ' "${state%%-*}" "${LABELS[$state]}"
         if [[ "$state" == "08-with-tmux" ]]; then
-            "$script" < "$fixture" | sed 's/^/  /'
+            # Always use mocked tmux for reproducibility
+            render_with_mock_tmux "$fixture" | sed 's/^/  /'
         else
             (unset TMUX; "$script" < "$fixture") | sed 's/^/  /'
         fi
