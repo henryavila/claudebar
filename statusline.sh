@@ -84,6 +84,51 @@ pr_chip() {
     esac
 }
 
+# ─── Portable stat-mtime ──────────────────────────────────────────────
+file_mtime() {
+    stat -c %Y "$1" 2>/dev/null || stat -f %m "$1" 2>/dev/null || echo 0
+}
+
+# ─── dirty_count SESSION_ID — git porcelain count, cached 5s ──────────
+# Returns: integer count of dirty files, or empty string if not in a git repo.
+dirty_count() {
+    local session_id=${1:-default}
+    local cache="/tmp/statusline-git-${session_id}"
+    local now mtime age
+    now=$(date +%s)
+
+    if [[ -f "$cache" ]]; then
+        mtime=$(file_mtime "$cache")
+        age=$(( now - mtime ))
+        if (( age < 5 )); then
+            cat "$cache"
+            return 0
+        fi
+    fi
+
+    # Cache stale or missing → regenerate
+    if ! have git || ! git rev-parse --git-dir >/dev/null 2>&1; then
+        echo "" > "$cache"
+        cat "$cache"
+        return 0
+    fi
+    git status --porcelain 2>/dev/null | wc -l | tr -d ' ' > "$cache"
+    cat "$cache"
+}
+
+# ─── dirty_indicator N — render "✎N" or "✓" ───────────────────────────
+dirty_indicator() {
+    local count=$1
+    if [[ -z "$count" ]]; then
+        return 0  # not a git repo → nothing
+    fi
+    if (( count > 0 )); then
+        fg "$C_DIRTY" "✎${count}"
+    else
+        fg "$C_CLEAN" "✓"
+    fi
+}
+
 minimal_fallback() {
     # Read stdin with grep (no jq) to extract just the model name
     local input model dir
