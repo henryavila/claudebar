@@ -160,6 +160,23 @@ pip_bar() {
     fi
 }
 
+# ─── pip_bar_compact PCT — 5-pip zone-colored bar (compact layout) ────
+pip_bar_compact() {
+    local pct=$1
+    local color filled i
+    color=$(zone_color "$pct")
+    filled=$(( pct * 5 / 100 ))
+    (( filled > 5 )) && filled=5
+    (( filled < 0 )) && filled=0
+    for ((i=0; i<5; i++)); do
+        if (( i < filled )); then
+            fg "$color" "▰"
+        else
+            fg "$C_BAR_DIM" "▱"
+        fi
+    done
+}
+
 # ─── tmux_chip — show tmux session:window.pane when inside tmux ────────
 # Reads $TMUX (set by tmux server) + queries tmux for display info.
 # Returns empty when not in tmux or tmux command fails.
