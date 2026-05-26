@@ -116,14 +116,17 @@ dirty_count() {
     cat "$cache"
 }
 
-# ─── dirty_indicator N — render "✎N" or "✓" ───────────────────────────
+# ─── dirty_indicator N — render " N" (Nerd Font pencil) or "✓" ───────
+# Note: U+270E ✎ is rendered emoji-wide (2 cells) by some terminals,
+# causing overlap with the number. Using Nerd Font  (U+F040 nf-fa-pencil)
+# which is guaranteed 1-cell, plus a space for defensive separation.
 dirty_indicator() {
     local count=$1
     if [[ -z "$count" ]]; then
         return 0  # not a git repo → nothing
     fi
     if (( count > 0 )); then
-        fg "$C_DIRTY" "✎${count}"
+        fg "$C_DIRTY" " ${count}"
     else
         fg "$C_CLEAN" "✓"
     fi
