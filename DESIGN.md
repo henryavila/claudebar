@@ -94,6 +94,62 @@ Both filled pips AND the percentage number take the **same zone color**. Empty p
 - `5h` bar hidden entirely if `rate_limits.five_hour` absent
 - `7d` bar hidden entirely if `rate_limits.seven_day` absent
 
+#### Countdown semantics (`5h` and `7d` chips)
+
+When the stdin JSON includes `rate_limits.{five_hour,seven_day}.resets_at` (Unix
+timestamp, emitted by Claude Code), the chip renders a magnitude-aware countdown
+between the label and the bar:
+
+```
+5h · 2h18m  ▰▰▱▱▱▱▱▱▱▱ 18%
+7d · 5d09h  ▰▰▱▱▱▱▱▱▱▱ 21%
+```
+
+| Range | Format | Example |
+|---|---|---|
+| `seconds < 60` (or negative — already reset) | `now` | `5h · now  ▰...` |
+| `60 ≤ s < 86400` | `XhYYm` (zero-padded minutes; X may be 0) | `0h32m`, `2h18m`, `23h59m` |
+| `86400 ≤ s ≤ 2592000` | `XdYYh` (zero-padded hours) | `1d04h`, `5d09h`, `7d00h` |
+| `s > 2592000` (>30 days) | `30d+` (defensive cap) | `30d+` |
+
+Colors: `·` separator and countdown text share the dim grey (245) of the label.
+Bar zone color and percentage stay zone-driven — the countdown is metadata, not
+a third alarm. Layout: `label SPACE · SPACE countdown TWO_SPACES bar SPACE pct%`.
+The extra space between countdown and bar visually clusters `[label · countdown]`
+as metadata vs `[bar pct%]` as the metric.
+
+**Absence:** when `resets_at` is missing, null, zero, or non-numeric, the chip
+falls back to `label SPACE bar SPACE pct%` (no countdown, no extra spacing).
+Backward-compatible with stdin that predates the field.
+
+**Determinism for tests:** `now_epoch()` returns `$CLAUDEBAR_NOW_FOR_TESTING`
+when set to a positive integer, otherwise `date +%s`. Empty/non-numeric values
+fall back defensively. Used by `test/run-all.sh` (`FROZEN_NOW = 1830000000`).
+
+#### Time-elapsed marker (`│`)
+
+When `resets_at` is present, the bar additionally gains a thin `│` marker
+showing **how far into the window we are**, in the same 10-pip resolution as
+the fill. The bar grows from 10 to 11 chars; the marker can land at any of
+11 slots (`0` = before pip 0, `N` = between pip N-1 and pip N, `10` = after
+pip 9). The juxtaposition is the whole point of the chip:
+
+| Marker vs fill edge | Reading | Example |
+|---|---|---|
+| Marker **at** fill edge | Burn rate matches time — on pace | `▰▰▰▰▰▰▰▰│▱▱` (89% usage, 89% elapsed) |
+| Marker **inside** fill | You're consuming faster than time — caution | `▰▰▰▰▰▰│▰▱▱▱` (72% usage, 40% elapsed) |
+| Marker **past** fill | Time is ahead of usage — you have margin | `▰▰▰▰▰▰▰▱│▱▱` (75% usage, 83% elapsed) |
+
+Position formula: `marker_pos = elapsed * 10 / WINDOW`, where
+`elapsed = WINDOW - (resets_at - now)` clamped to `[0, WINDOW]`. Window
+durations are pinned (`WINDOW_5H_SECONDS = 18000`, `WINDOW_7D_SECONDS = 604800`)
+because Anthropic's rolling-window semantics aren't public — a fixed
+denominator is a good enough approximation for glanceable "burning fast?"
+reading.
+
+Marker color: dim grey (245), same as the label and the countdown text —
+preserves the bar+% as the saturation signal and the marker as metadata.
+
 ### Special State — Agent Active
 
 When `agent.name` is present (subagent dispatched, user's turn paused):
@@ -172,7 +228,9 @@ Layout shifts left and gaps collapse when a field is absent. **No placeholder te
 | `agent.name` | Normal identity row (model + effort restored to bright/colored) |
 | `context_window.used_percentage` | Show `ctx 0% ▱▱▱▱▱▱▱▱▱▱` |
 | `rate_limits.five_hour.used_percentage` | Hide `5h` bar entirely |
+| `rate_limits.five_hour.resets_at` | Hide `· countdown` segment of `5h` chip; bar+pct still render |
 | `rate_limits.seven_day.used_percentage` | Hide `7d` bar entirely |
+| `rate_limits.seven_day.resets_at` | Hide `· countdown` segment of `7d` chip; bar+pct still render |
 | Git status command fails / not a repo | Hide owner/repo, branch, dirty, PR all together (whole git block gone) |
 
 ---
