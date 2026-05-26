@@ -43,6 +43,13 @@ else
 fi
 touch "$cache_file"  # ensure mtime is fresh so dirty_count() uses cache (< 5s window)
 
+# Per-fixture branch override (e.g. to test long branch names)
+branch_sidecar="$dir/fixtures/${name}.branch"
+if [[ -f "$branch_sidecar" ]]; then
+    CLAUDEBAR_BRANCH_FOR_TESTING=$(cat "$branch_sidecar")
+    export CLAUDEBAR_BRANCH_FOR_TESTING
+fi
+
 # Unset TMUX so tmux_chip stays empty in integration fixtures — fixture
 # output should be deterministic regardless of whether tests run inside tmux.
 # (test/unit/test-tmux.sh covers the tmux feature explicitly with mocked env.)
