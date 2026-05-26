@@ -27,6 +27,7 @@ readonly C_BAR_YELLOW=220
 readonly C_BAR_RED=196
 readonly C_BAR_DIM=238
 readonly C_AGENT=141
+readonly C_TMUX=105
 readonly C_SEP=238
 
 # ─── ANSI helpers ──────────────────────────────────────────────────────
@@ -54,6 +55,19 @@ pip_bar() {
     empty=$(( 10 - filled ))
     for ((i=0; i<filled; i++)); do fg "$color" "▰"; done
     for ((i=0; i<empty;  i++)); do fg "$C_BAR_DIM" "▱"; done
+}
+
+# ─── tmux_chip — show tmux session:window.pane when inside tmux ────────
+# Reads $TMUX (set by tmux server) + queries tmux for display info.
+# Returns empty when not in tmux or tmux command fails.
+# Glyph:  (U+F1B2 nf-fa-cube), 1-cell wide in Nerd Fonts.
+tmux_chip() {
+    [[ -z "${TMUX:-}" ]] && return 0
+    have tmux || return 0
+    local context
+    context=$(tmux display-message -p '#S:#I.#P' 2>/dev/null) || return 0
+    [[ -z "$context" ]] && return 0
+    fg "$C_TMUX" " ${context}"
 }
 
 # ─── effort_chip LEVEL — colored text chip per effort level ────────────
@@ -179,6 +193,16 @@ identity_row() {
             printf ' '
             effort_chip "$effort"
         fi
+    fi
+
+    # ── Tmux chip (only when running inside tmux) ──────────
+    local tmux_out
+    tmux_out=$(tmux_chip)
+    if [[ -n "$tmux_out" ]]; then
+        printf ' '
+        sep "·"
+        printf ' '
+        printf '%s' "$tmux_out"
     fi
 
     # ── Middle group: repo › [⎇ ]branch dirty ────────────

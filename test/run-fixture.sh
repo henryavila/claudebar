@@ -30,7 +30,10 @@ else
 fi
 touch "$cache_file"  # ensure mtime is fresh so dirty_count() uses cache (< 5s window)
 
-actual=$("$script" < "$fixture")
+# Unset TMUX so tmux_chip stays empty in integration fixtures — fixture
+# output should be deterministic regardless of whether tests run inside tmux.
+# (test/unit/test-tmux.sh covers the tmux feature explicitly with mocked env.)
+actual=$(unset TMUX; "$script" < "$fixture")
 expected_content=$(cat "$expected")
 
 if [[ "$actual" == "$expected_content" ]]; then

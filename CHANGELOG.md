@@ -4,33 +4,24 @@
 
 (nothing yet)
 
-## v1.2.0 — 2026-05-26
-
-- Add `uninstall.sh` to disable the statusline by restoring a prior backup
-- Lists all install-time backups, defaults to most recent, lets user pick interactively if multiple
-- Snapshots current state as `settings.json.before-uninstall-<ts>` in case user wants to redo
-- Validates restored JSON via jq when available; warns (not errors) if jq absent
-- Files in `~/.claude/statusline/` are left in place; uninstall prints exact `rm -rf` command for full removal
-
-## v1.1.0 — 2026-05-26
-
-- Add `install.sh` for plug-and-play setup on macOS, native Ubuntu/Debian/Arch/Fedora, and WSL
-- Validates prerequisites (bash 4+, jq, git, 256-color terminal, Nerd Font) with descriptive errors per-platform
-- Auto-backs up `~/.claude/settings.json` with timestamp and patches `statusLine` block via jq
-- README updated with install instructions
-
 ## v1.0.0 — 2026-05-26
 
-- Replaced ccline with custom pip-style statusline
-- Zone-driven colors (60/90 thresholds), worktree marker, git dirty indicator, agent pulse
-- Initial implementation per `DESIGN.md` 2026-05-26
+Initial release.
 
-### Rollback
+### Features
 
-If anything goes wrong, restore the old statusline:
+- 2-row pip-style statusline for Claude Code (replaces ccline)
+- Zone-driven colors: green `<60%`, yellow `60-89%`, red `≥90%` on all 3 bars
+- Identity row: model + effort chip + tmux context + owner/repo + worktree marker + branch + dirty/clean indicator + PR chip with review state
+- Fuel-gauge row: ctx + 5h rate limit + 7d rate limit (each bar hidden when the corresponding JSON field is absent)
+- Agent-active mode: model dims to grey, effort chip replaced by pulsing agent name chip (blink ANSI)
+- Tmux integration: `· session:window.pane` chip auto-appears when running inside tmux
+- Cross-platform: macOS, Ubuntu, Debian, Arch, Fedora, WSL2 — same script, no edits required
 
-```bash
-cp ~/.claude/settings.json.bak-pre-statusline-redesign ~/.claude/settings.json
-```
+### Tooling
 
-Then restart Claude Code.
+- `install.sh` — validates prerequisites (bash 4+, jq, git, 256-color terminal, Nerd Font) with per-platform install hints. Backs up `~/.claude/settings.json` with timestamp and patches the `statusLine` block via jq.
+- `uninstall.sh` — lists install-time backups, restores chosen one (or auto-picks the most recent), snapshots current state first in case you change your mind.
+- 20 automated tests: 8 unit tests (palette, zone color, pip bar, chips, identity row, fuel row, git cache, tmux, dependency fallback) + 12 integration fixtures covering the 7 demo states + 5 absence patterns.
+- Performance: <50ms warm-cache execution. Single `jq` invocation, 5-second session-scoped cache for `git status`.
+- Portability test: enforces no GNU-only flags, no realpath/readlink -f, no bash 5+ syntax.
