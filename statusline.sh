@@ -260,13 +260,64 @@ minimal_fallback() {
 }
 
 main() {
+    # Dependency probe
     if ! have jq; then
         minimal_fallback
         return 0
     fi
-    # Full implementation comes in later tasks
-    cat > /dev/null
-    echo "TODO: implement statusline (jq present)"
+
+    local input jq_out
+    input=$(cat)
+
+    # Parse once with jq — emit shell-safe assignments via @sh, then eval them.
+    # Each field uses // "" fallback so absent fields → empty bash vars.
+    jq_out=$(printf '%s' "$input" | jq -r '
+        "MODEL="      + ((.model.display_name // .model.id // "?") | @sh) + "\n" +
+        "SESSION_ID=" + ((.session_id // "default") | @sh) + "\n" +
+        "EFFORT="     + ((.effort.level // "") | @sh) + "\n" +
+        "OWNER="      + ((.workspace.repo.owner // "") | @sh) + "\n" +
+        "REPO="       + ((.workspace.repo.name // "") | @sh) + "\n" +
+        "WORKTREE="   + ((.workspace.git_worktree // "") | @sh) + "\n" +
+        "CTX="        + ((.context_window.used_percentage // 0 | floor) | tostring | @sh) + "\n" +
+        "FIVE_HOUR="  + ((.rate_limits.five_hour.used_percentage // "") | tostring | @sh) + "\n" +
+        "SEVEN_DAY="  + ((.rate_limits.seven_day.used_percentage // "") | tostring | @sh) + "\n" +
+        "PR_NUMBER="  + ((.pr.number // "") | tostring | @sh) + "\n" +
+        "PR_STATE="   + ((.pr.review_state // "") | @sh) + "\n" +
+        "AGENT="      + ((.agent.name // "") | @sh)
+    ')
+    eval "$jq_out"
+
+    # Derive branch (not in JSON for normal sessions — git is source of truth)
+    local BRANCH=""
+    if have git && git rev-parse --git-dir >/dev/null 2>&1; then
+        BRANCH=$(git branch --show-current 2>/dev/null || echo "")
+    fi
+
+    # Derive dirty count
+    local DIRTY=""
+    if have git && git rev-parse --git-dir >/dev/null 2>&1; then
+        DIRTY=$(dirty_count "$SESSION_ID")
+    fi
+
+    # Cast FIVE_HOUR / SEVEN_DAY (jq emits floats like "23.5") to int
+    [[ -n "$FIVE_HOUR" ]] && FIVE_HOUR=$(printf '%.0f' "$FIVE_HOUR")
+    [[ -n "$SEVEN_DAY" ]] && SEVEN_DAY=$(printf '%.0f' "$SEVEN_DAY")
+
+    # Render
+    identity_row \
+        model="$MODEL" \
+        effort="$EFFORT" \
+        owner="$OWNER" repo="$REPO" \
+        worktree="$WORKTREE" \
+        branch="$BRANCH" \
+        dirty_count="$DIRTY" \
+        pr_number="$PR_NUMBER" pr_state="$PR_STATE" \
+        agent="$AGENT"
+
+    fuel_row \
+        ctx="$CTX" \
+        five_hour="$FIVE_HOUR" \
+        seven_day="$SEVEN_DAY"
 }
 
 # Sourcing guard: only run main when invoked directly
