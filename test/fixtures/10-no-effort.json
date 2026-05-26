@@ -1,0 +1,13 @@
+{
+  "session_id": "test-10",
+  "model": {"id": "claude-haiku-4-5", "display_name": "Haiku 4.5"},
+  "workspace": {
+    "current_dir": "/home/henry/arch",
+    "repo": {"host": "github.com", "owner": "henryavila", "name": "arch"}
+  },
+  "context_window": {"used_percentage": 12},
+  "rate_limits": {
+    "five_hour": {"used_percentage": 18},
+    "seven_day": {"used_percentage": 45}
+  }
+}
