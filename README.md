@@ -3,7 +3,7 @@
 A two-row, zone-driven statusline for [Claude Code](https://docs.claude.com/en/docs/claude-code/overview). Designed for the subscriber tier: rate-limit awareness matters more than dollar cost.
 
 <p align="center">
-  <img src="docs/screenshots/all-states.svg" alt="claudebar across 6 realistic session states" width="100%">
+  <img src="docs/screenshots/all-states.png" alt="claudebar across 8 realistic session states" width="800">
 </p>
 
 ## What it does
@@ -11,7 +11,7 @@ A two-row, zone-driven statusline for [Claude Code](https://docs.claude.com/en/d
 Reads the JSON [session context](https://code.claude.com/docs/en/statusline#available-data) Claude Code feeds it via stdin after every message, and prints two ANSI-colored rows:
 
 ```
-✦ Opus 4.7 · HIGH · ⌗ tmux-session:1.2  owner/repo › ⎇  branch  3   #1234 ⏳
+✦ Opus 4.7 · HIGH · tmux:session:1.2  owner/repo › ⎇  branch  3   #1234 ⏳
 ctx ▰▰▱▱▱▱▱▱▱▱ 23%   5h  ▰▰▰▱▱▱▱▱▱▱ 34%   7d  ▰▰▰▰▰▰▱▱▱▱ 62%
 ```
 
@@ -23,7 +23,7 @@ Fuel-gauge row (bottom) — *how much runway do I have?*
 - **Pip-style fuel gauges** with **zone-driven colors**: green `<60%`, yellow `60-89%`, red `≥90%` — applied independently to context window, 5-hour rate limit, and 7-day rate limit. The bar shape tells you "how full"; the color tells you "how worried".
 - **Identity row** shows model, [reasoning effort](https://docs.claude.com/en/api/messages#extended-thinking), tmux pane context, repo, worktree, branch, dirty file count, and PR review state.
 - **Agent-active mode**: when a subagent is dispatched, the model name dims and a pulsing chip shows the agent name — at-a-glance "my turn is paused".
-- **Tmux integration**: when running inside tmux, the identity row gains a `⌗ session:window.pane` chip to disambiguate multiple Claude sessions across panes.
+- **Tmux integration**: when running inside tmux, the identity row gains a `tmux:session:window.pane` chip to disambiguate multiple Claude sessions across panes.
 - **Graceful degradation**: rate-limit bars hide when not on a subscriber tier; PR chip hides without a PR; effort chip hides on models without effort support; worktree marker hides outside worktrees. No placeholder text, no orphan separators.
 - **Cross-platform**: macOS, Ubuntu/Debian, Arch, Fedora, WSL2 — same bash script, no edits.
 
@@ -31,12 +31,14 @@ Fuel-gauge row (bottom) — *how much runway do I have?*
 
 | State | Render |
 |---|---|
-| Calm start of session | <img src="docs/screenshots/01-calm.svg" width="500"> |
-| Mid-session, dirty tree, PR pending | <img src="docs/screenshots/02-mid-session.svg" width="500"> |
-| Caution — yellow zone | <img src="docs/screenshots/03-caution.svg" width="500"> |
-| Danger — red zone + changes requested | <img src="docs/screenshots/04-danger.svg" width="500"> |
-| Subagent dispatched | <img src="docs/screenshots/05-agent.svg" width="500"> |
-| PR approved | <img src="docs/screenshots/06-pr-approved.svg" width="500"> |
+| **Calm** — start of session, low context, clean tree | <img src="docs/screenshots/01-calm.png" width="700"> |
+| **Mid-session** — worktree, dirty tree, PR pending | <img src="docs/screenshots/02-mid-session.png" width="700"> |
+| **Caution** — yellow zone (60-89%) | <img src="docs/screenshots/03-caution.png" width="700"> |
+| **Danger** — red zone (≥90%) + PR changes requested | <img src="docs/screenshots/04-danger.png" width="700"> |
+| **Subagent dispatched** — model dims, agent chip pulses | <img src="docs/screenshots/05-agent.png" width="700"> |
+| **PR approved** — clean tree, green PR chip | <img src="docs/screenshots/06-pr-approved.png" width="700"> |
+| **Main working tree** — no worktree, no PR, minimal chrome | <img src="docs/screenshots/07-main-working-tree.png" width="700"> |
+| **Tmux integration** — `tmux:session:window.pane` chip | <img src="docs/screenshots/08-tmux-integration.png" width="700"> |
 
 ## Install
 
