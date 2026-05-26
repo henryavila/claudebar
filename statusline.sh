@@ -43,6 +43,19 @@ zone_color() {
     fi
 }
 
+# ─── pip_bar PCT — render 10-pip zone-colored bar ─────────────────────
+pip_bar() {
+    local pct=$1
+    local color filled empty i
+    color=$(zone_color "$pct")
+    filled=$(( pct * 10 / 100 ))
+    (( filled > 10 )) && filled=10
+    (( filled < 0 ))  && filled=0
+    empty=$(( 10 - filled ))
+    for ((i=0; i<filled; i++)); do fg "$color" "▰"; done
+    for ((i=0; i<empty;  i++)); do fg "$C_BAR_DIM" "▱"; done
+}
+
 minimal_fallback() {
     # Read stdin with grep (no jq) to extract just the model name
     local input model dir
