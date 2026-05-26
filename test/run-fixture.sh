@@ -20,7 +20,7 @@ if [[ ! -f "$fixture" ]]; then echo "Missing fixture: $fixture" >&2; exit 2; fi
 if [[ ! -f "$expected" ]]; then echo "Missing expected: $expected" >&2; exit 2; fi
 
 # Extract session_id from JSON, pre-populate cache for hermetic dirty count
-session_id=$(grep -o '"session_id":"[^"]*"' "$fixture" | head -1 | cut -d'"' -f4)
+session_id=$(grep -o '"session_id" *: *"[^"]*"' "$fixture" | head -1 | grep -o '"[^"]*"$' | tr -d '"')
 session_id=${session_id:-default}
 cache_file="/tmp/statusline-git-${session_id}"
 if [[ -f "$dirty_sidecar" ]]; then
@@ -28,6 +28,7 @@ if [[ -f "$dirty_sidecar" ]]; then
 else
     echo "0" > "$cache_file"
 fi
+touch "$cache_file"  # ensure mtime is fresh so dirty_count() uses cache (< 5s window)
 
 actual=$("$script" < "$fixture")
 expected_content=$(cat "$expected")

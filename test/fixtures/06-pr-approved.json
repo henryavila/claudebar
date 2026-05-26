@@ -1,0 +1,16 @@
+{
+  "session_id": "test-06",
+  "model": {"id": "claude-opus-4-7", "display_name": "Opus 4.7"},
+  "workspace": {
+    "current_dir": "/home/henry/arch",
+    "repo": {"host": "github.com", "owner": "henryavila", "name": "arch"},
+    "git_worktree": "filament-v4-migration"
+  },
+  "effort": {"level": "high"},
+  "context_window": {"used_percentage": 28},
+  "rate_limits": {
+    "five_hour": {"used_percentage": 42},
+    "seven_day": {"used_percentage": 65}
+  },
+  "pr": {"number": 1234, "review_state": "approved"}
+}
