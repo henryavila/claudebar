@@ -56,6 +56,34 @@ pip_bar() {
     for ((i=0; i<empty;  i++)); do fg "$C_BAR_DIM" "▱"; done
 }
 
+# ─── effort_chip LEVEL — colored text chip per effort level ────────────
+effort_chip() {
+    local level=$1
+    case "$level" in
+        low)    fg "$C_EFFORT_LOW" "LOW" ;;
+        medium) fg "$C_EFFORT_MED" "MED" ;;
+        high)   fg "$C_EFFORT_HI"  "HIGH" ;;
+        xhigh)  fg "$C_EFFORT_XHI" "XHIGH" ;;
+        max)    fg "$C_EFFORT_MAX" "MAX" ;;
+        *)      : ;;  # absent or unknown → empty
+    esac
+}
+
+# ─── pr_chip NUMBER STATE — colored PR chip with state glyph ───────────
+# Glyph: nf-fa-code-pull-request (U+F407) ""
+pr_chip() {
+    local number=$1 state=$2
+    local pr_glyph=$''
+    case "$state" in
+        pending)           fg "$C_PR_PENDING"  "${pr_glyph} #${number} ⏳" ;;
+        approved)          fg "$C_PR_APPROVED" "${pr_glyph} #${number} ✓" ;;
+        changes_requested) fg "$C_PR_CHANGES"  "${pr_glyph} #${number} ✗" ;;
+        draft)             fg "$C_PR_DRAFT"    "${pr_glyph} #${number} ◯" ;;
+        "")                fg "$C_PR_PENDING"  "${pr_glyph} #${number}" ;;
+        *)                 fg "$C_PR_PENDING"  "${pr_glyph} #${number}" ;;
+    esac
+}
+
 minimal_fallback() {
     # Read stdin with grep (no jq) to extract just the model name
     local input model dir
