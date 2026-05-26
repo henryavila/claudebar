@@ -1,0 +1,16 @@
+{
+  "session_id": "test-23-compact",
+  "model": {"id": "claude-opus-4-7", "display_name": "Opus 4.7"},
+  "workspace": {
+    "current_dir": "/home/henry/arch",
+    "repo": {"host": "github.com", "owner": "henryavila", "name": "arch"}
+  },
+  "effort": {"level": "high"},
+  "context_window": {"used_percentage": 23},
+  "rate_limits": {
+    "five_hour": {"used_percentage": 34},
+    "seven_day": {"used_percentage": 62}
+  },
+  "pr": {"number": 99, "review_state": "pending"},
+  "agent": {"name": "Explore"}
+}
