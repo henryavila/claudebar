@@ -79,13 +79,17 @@ pip_bar() {
 # Reads $TMUX (set by tmux server) + queries tmux for display info.
 # Returns empty when not in tmux or tmux command fails.
 # Uses GLYPH_TMUX (declared at top).
+# Format: " tmux:session:window.pane" — explicit "tmux:" prefix prevents
+# visual confusion when the tmux session name coincides with the repo
+# name (e.g. session "arch" + repo "henryavila/arch" → without prefix
+# the chip just reads "arch:1.1" which can be mistaken for another chip).
 tmux_chip() {
     [[ -z "${TMUX:-}" ]] && return 0
     have tmux || return 0
     local context
     context=$(tmux display-message -p '#S:#I.#P' 2>/dev/null) || return 0
     [[ -z "$context" ]] && return 0
-    fg "$C_TMUX" "${GLYPH_TMUX} ${context}"
+    fg "$C_TMUX" "${GLYPH_TMUX} tmux:${context}"
 }
 
 # ─── effort_chip LEVEL — colored text chip per effort level ────────────
