@@ -206,6 +206,48 @@ identity_row() {
     printf '\n'
 }
 
+# ─── fuel_row — compose row 2 (the 3 bars) ────────────────────────────
+# Usage: fuel_row key=value key=value ...
+# Keys: ctx five_hour seven_day
+fuel_row() {
+    local ctx="" five_hour="" seven_day=""
+    local arg
+    for arg in "$@"; do
+        case "$arg" in
+            ctx=*)        ctx=${arg#ctx=} ;;
+            five_hour=*)  five_hour=${arg#five_hour=} ;;
+            seven_day=*)  seven_day=${arg#seven_day=} ;;
+        esac
+    done
+
+    # ctx — always render even if 0
+    : "${ctx:=0}"
+    fg "$C_REPO" "ctx"; printf ' '
+    pip_bar "$ctx"
+    printf ' '
+    fg "$(zone_color "$ctx")" "$(printf '%2d%%' "$ctx")"
+
+    # 5h
+    if [[ -n "$five_hour" ]]; then
+        printf '   '
+        fg "$C_REPO" "5h"; printf '  '
+        pip_bar "$five_hour"
+        printf ' '
+        fg "$(zone_color "$five_hour")" "$(printf '%2d%%' "$five_hour")"
+    fi
+
+    # 7d
+    if [[ -n "$seven_day" ]]; then
+        printf '   '
+        fg "$C_REPO" "7d"; printf '  '
+        pip_bar "$seven_day"
+        printf ' '
+        fg "$(zone_color "$seven_day")" "$(printf '%2d%%' "$seven_day")"
+    fi
+
+    printf '\n'
+}
+
 minimal_fallback() {
     # Read stdin with grep (no jq) to extract just the model name
     local input model dir
