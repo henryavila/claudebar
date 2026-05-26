@@ -3,6 +3,14 @@
 # Validates prerequisites (does NOT install them) and patches Claude Code's settings.json.
 set -uo pipefail
 
+# ─── Flags ───────────────────────────────────────────────────────────
+NON_INTERACTIVE=0
+for arg in "$@"; do
+    case "$arg" in
+        --non-interactive) NON_INTERACTIVE=1 ;;
+    esac
+done
+
 # ─── Colored output helpers ──────────────────────────────────────────
 RED=$'\033[31m'; GREEN=$'\033[32m'; YELLOW=$'\033[33m'
 BLUE=$'\033[36m'; BOLD=$'\033[1m'; RESET=$'\033[0m'
@@ -154,7 +162,11 @@ main() {
     check_cmd jq
     check_cmd git
     check_colors
-    check_nerdfont
+    if (( NON_INTERACTIVE )); then
+        info "Nerd Font check: skipped (--non-interactive)"
+    else
+        check_nerdfont
+    fi
 
     section "Claude Code integration"
     check_settings
@@ -162,12 +174,16 @@ main() {
     patch_settings
 
     section "Install complete"
-    printf 'Next steps:\n'
-    printf '  1. Restart Claude Code OR send any message in your current session\n'
-    printf '  2. New statusline appears at the bottom of your terminal\n\n'
-    printf 'Rollback if needed:\n'
-    printf '  cp %s %s\n\n' "$BACKUP_PATH" "$SETTINGS"
-    printf 'Test: ./test/run-all.sh\n\n'
+    if (( NON_INTERACTIVE )); then
+        ok "statusline configured (backup: $BACKUP_PATH)"
+    else
+        printf 'Next steps:\n'
+        printf '  1. Restart Claude Code OR send any message in your current session\n'
+        printf '  2. New statusline appears at the bottom of your terminal\n\n'
+        printf 'Rollback if needed:\n'
+        printf '  cp %s %s\n\n' "$BACKUP_PATH" "$SETTINGS"
+        printf 'Test: ./test/run-all.sh\n\n'
+    fi
 }
 
 main "$@"
