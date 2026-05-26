@@ -130,17 +130,25 @@ dirty_count() {
     cat "$cache"
 }
 
-# ─── dirty_indicator N — render " N" (Nerd Font pencil) or "✓" ───────
-# Note: U+270E ✎ is rendered emoji-wide (2 cells) by some terminals,
-# causing overlap with the number. Using Nerd Font  (U+F040 nf-fa-pencil)
-# which is guaranteed 1-cell, plus a space for defensive separation.
+# ─── dirty_indicator N — render edit-pencil + count, or ✓ when clean ─
+# Notes:
+#   - U+270E ✎ (Dingbats) renders emoji-wide (2 cells) in some terminals,
+#     causing the count digit to overlap the icon. Avoid.
+#   - Nerd Font glyphs (U+E000-F8FF private use) are guaranteed 1-cell but
+#     may be stripped by source-file editors that normalize that range.
+#     We build the glyph from UTF-8 byte escapes so the source stays ASCII
+#     and the icon is reconstructed at runtime.
+#   - PENCIL_GLYPH = U+F040 (nf-fa-pencil) in bytes: 0xEF 0x81 0x80.
+#   - Space between glyph and count is intentional — defensive separation
+#     in case some terminal/font renders the glyph at >1 cell.
+readonly PENCIL_GLYPH=$'\xef\x81\x80'
 dirty_indicator() {
     local count=$1
     if [[ -z "$count" ]]; then
         return 0  # not a git repo → nothing
     fi
     if (( count > 0 )); then
-        fg "$C_DIRTY" " ${count}"
+        fg "$C_DIRTY" "${PENCIL_GLYPH} ${count}"
     else
         fg "$C_CLEAN" "✓"
     fi
