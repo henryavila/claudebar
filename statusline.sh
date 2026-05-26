@@ -606,22 +606,43 @@ main() {
     [[ -n "$SEVEN_DAY" ]] && SEVEN_DAY=$(printf '%.0f' "$SEVEN_DAY")
 
     # Render
-    identity_row \
-        model="$MODEL" \
-        effort="$EFFORT" \
-        owner="$OWNER" repo="$REPO" \
-        worktree="$WORKTREE" \
-        branch="$BRANCH" \
-        dirty_count="$DIRTY" \
-        pr_number="$PR_NUMBER" pr_state="$PR_STATE" \
-        agent="$AGENT"
+    local layout
+    layout=$(detect_layout)
 
-    fuel_row \
-        ctx="$CTX" \
-        five_hour="$FIVE_HOUR" \
-        seven_day="$SEVEN_DAY" \
-        five_hour_resets_at="$FIVE_HOUR_RESETS_AT" \
-        seven_day_resets_at="$SEVEN_DAY_RESETS_AT"
+    if [[ "$layout" == "compact" ]]; then
+        compact_row1 \
+            model="$MODEL" \
+            effort="$EFFORT" \
+            pr_number="$PR_NUMBER" pr_state="$PR_STATE" \
+            agent="$AGENT"
+
+        compact_row2 \
+            repo="$REPO" \
+            branch="$BRANCH" \
+            dirty_count="$DIRTY"
+
+        compact_row3 \
+            ctx="$CTX" \
+            five_hour="$FIVE_HOUR" \
+            seven_day="$SEVEN_DAY"
+    else
+        identity_row \
+            model="$MODEL" \
+            effort="$EFFORT" \
+            owner="$OWNER" repo="$REPO" \
+            worktree="$WORKTREE" \
+            branch="$BRANCH" \
+            dirty_count="$DIRTY" \
+            pr_number="$PR_NUMBER" pr_state="$PR_STATE" \
+            agent="$AGENT"
+
+        fuel_row \
+            ctx="$CTX" \
+            five_hour="$FIVE_HOUR" \
+            seven_day="$SEVEN_DAY" \
+            five_hour_resets_at="$FIVE_HOUR_RESETS_AT" \
+            seven_day_resets_at="$SEVEN_DAY_RESETS_AT"
+    fi
 }
 
 # Sourcing guard: only run main when invoked directly
