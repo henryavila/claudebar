@@ -57,9 +57,14 @@ install_hint() {
 # ─── Check 1: bash version ───────────────────────────────────────────
 check_bash() {
     if (( BASH_VERSINFO[0] < 4 )); then
-        error "Need bash 4+, found ${BASH_VERSION}. On macOS the default bash is 3.2.57 (frozen at GPLv2). Install a newer bash: $(install_hint bash) — then ensure it's first on PATH."
+        if (( NON_INTERACTIVE )); then
+            warn "bash ${BASH_VERSION} < 4 — statusline.sh needs bash 4+ at runtime. Ensure a modern bash is on PATH when Claude Code runs."
+        else
+            error "Need bash 4+, found ${BASH_VERSION}. On macOS the default bash is 3.2.57 (frozen at GPLv2). Install a newer bash: $(install_hint bash) — then ensure it's first on PATH."
+        fi
+    else
+        ok "bash ${BASH_VERSION}"
     fi
-    ok "bash ${BASH_VERSION}"
 }
 
 # ─── Check 2: required CLI tools ─────────────────────────────────────
