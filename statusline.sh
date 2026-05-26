@@ -234,7 +234,7 @@ compact_row2() {
         esac
     done
 
-    [[ -z "$repo" ]] && { printf '\n'; return; }
+    [[ -z "$repo" ]] && return
 
     fg "$C_REPO" "$repo"
     printf ' '

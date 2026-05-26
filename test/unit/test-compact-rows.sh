@@ -62,7 +62,7 @@ fi
 
 # No repo → empty output
 out=$(compact_row2 repo="" branch="" dirty_count="")
-if [[ -z "$(printf '%s' "$out" | tr -d '[:space:]')" ]]; then
+if [[ -z "$out" ]]; then
     echo "  ok: compact_row2 no repo = empty"
 else
     echo "  FAIL: compact_row2 no repo should be empty"; fail=1
