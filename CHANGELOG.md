@@ -1,8 +1,19 @@
 # Changelog
 
-## Unreleased
+## v1.1.0 — Unreleased
 
-(nothing yet)
+### Features
+
+- **Quota reset countdown** on the `5h` and `7d` chips. When stdin carries `rate_limits.*.resets_at` (Unix timestamp), the chip prepends a magnitude-aware countdown between label and bar — `5h · 2h18m  ▰...`, `7d · 5d09h  ▰...`. Format: `now` (<60s), `XhYYm` (<24h), `XdYYh` (<30d), `30d+` cap. Color is the dim grey of the label so the bar+% remain the saturation signal. When `resets_at` is absent, the chip renders exactly as before — backward-compatible.
+- **Time-elapsed marker (`│`)** in the same 5h/7d bars. The bar grows from 10 to 11 chars; the marker shows how far into the window we are. When the marker is *inside* the fill, you're burning faster than time allows (`▰▰▰▰▰▰│▰▱▱▱`); *past* the fill, you have margin (`▰▰▰▰▰▰▰▱│▱▱`); *at* the fill edge, you're on pace. Marker color matches the label (dim 245) so it reads as metadata, not a third zone signal.
+
+### Testing
+
+- Two new helpers (`format_countdown`, `now_epoch`) with dedicated unit tests (`test/unit/test-format-countdown.sh`, `test/unit/test-now-epoch.sh`).
+- `pip_bar` extended with optional `MARKER_POS` arg (0-10 slots, defensive clamp). Back-compat preserved: callers without a marker keep the legacy 10-char render. Unit tests in `test/unit/test-pip-bar.sh` cover 10 marker cases including edge slots and defensive bounds.
+- Three new fixtures (`15-countdown-fresh`, `16-countdown-critical`, `17-resets-at-missing`) plus deterministic recalibration of fixtures 01-12 against `CLAUDEBAR_NOW_FOR_TESTING=1830000000`.
+- `CLAUDEBAR_BRANCH_FOR_TESTING` env var added to make fixture expected outputs hermetic — they no longer leak the runner's git branch.
+- Suite grew from 20 to 25 tests (10 unit + 15 fixtures). All under the 50ms warm budget.
 
 ## v1.0.0 — 2026-05-26
 

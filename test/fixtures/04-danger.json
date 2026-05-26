@@ -9,8 +9,8 @@
   "effort": {"level": "max"},
   "context_window": {"used_percentage": 92},
   "rate_limits": {
-    "five_hour": {"used_percentage": 89},
-    "seven_day": {"used_percentage": 75}
+    "five_hour": {"used_percentage": 89, "resets_at": 1830001920},
+    "seven_day": {"used_percentage": 75, "resets_at": 1830100800}
   },
   "pr": {"number": 1234, "review_state": "changes_requested"}
 }

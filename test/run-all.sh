@@ -2,6 +2,16 @@
 # Run all tests: unit tests first, then every fixture in test/fixtures/.
 set -uo pipefail
 
+# Frozen "now" for deterministic countdown snapshots across all fixtures.
+# 1830000000 = 2027-12-26 22:40:00 UTC (arbitrary anchor; only deltas matter).
+# Every fixture's resets_at is computed as FROZEN_NOW + offset, so the
+# rendered countdown is reproducible regardless of when the suite runs.
+export CLAUDEBAR_NOW_FOR_TESTING=1830000000
+
+# Frozen branch name — `git branch --show-current` would otherwise leak the
+# CI/dev branch into expected outputs and break tests on feature branches.
+export CLAUDEBAR_BRANCH_FOR_TESTING=main
+
 dir="$(cd "$(dirname "$0")" && pwd)"
 pass=0
 fail=0

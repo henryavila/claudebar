@@ -21,6 +21,7 @@ Fuel-gauge row (bottom) — *how much runway do I have?*
 ## Features
 
 - **Pip-style fuel gauges** with **zone-driven colors**: green `<60%`, yellow `60-89%`, red `≥90%` — applied independently to context window, 5-hour rate limit, and 7-day rate limit. The bar shape tells you "how full"; the color tells you "how worried".
+- **Quota reset countdown + time-elapsed marker** on the `5h` and `7d` chips: `5h · 2h18m  ▰▰▰▰│▰▰▱▱▱▱ 60%`. The text tells you *when* the window resets; the `│` inside the bar shows *how far* into the window you already are. When the marker is **inside** the fill, you're burning faster than time allows; **past** the fill, you have margin.
 - **Identity row** shows model, [reasoning effort](https://docs.claude.com/en/api/messages#extended-thinking), tmux pane context, repo, worktree, branch, dirty file count, and PR review state.
 - **Agent-active mode**: when a subagent is dispatched, the model name dims and a pulsing chip shows the agent name — at-a-glance "my turn is paused".
 - **Tmux integration**: when running inside tmux, the identity row gains a `tmux:session:window.pane` chip to disambiguate multiple Claude sessions across panes.
@@ -120,7 +121,7 @@ The codes are standard xterm-256. [Cheat sheet here](https://www.ditig.com/256-c
 ## Testing
 
 ```bash
-~/claudebar/test/run-all.sh         # 20 tests (8 unit + 12 integration fixtures)
+~/claudebar/test/run-all.sh         # 25 tests (10 unit + 15 integration fixtures)
 ~/claudebar/test/perf.sh            # asserts <50ms warm-cache execution
 ~/claudebar/test/portability.sh     # checks no GNU-only flags, no bash 5+ syntax, etc.
 ```

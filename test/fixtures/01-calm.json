@@ -9,7 +9,7 @@
   "effort": {"level": "medium"},
   "context_window": {"used_percentage": 12, "context_window_size": 200000},
   "rate_limits": {
-    "five_hour":  {"used_percentage": 18, "resets_at": 1830000000},
-    "seven_day":  {"used_percentage": 45, "resets_at": 1830500000}
+    "five_hour":  {"used_percentage": 18, "resets_at": 1830015120},
+    "seven_day":  {"used_percentage": 45, "resets_at": 1830534240}
   }
 }

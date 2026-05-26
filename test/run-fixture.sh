@@ -16,6 +16,11 @@ expected="$dir/expected/${name}.txt"
 dirty_sidecar="$dir/fixtures/${name}.dirty"
 script="$dir/../statusline.sh"
 
+# Allow standalone invocation (not via run-all.sh) to still be deterministic.
+: "${CLAUDEBAR_NOW_FOR_TESTING:=1830000000}"
+: "${CLAUDEBAR_BRANCH_FOR_TESTING:=main}"
+export CLAUDEBAR_NOW_FOR_TESTING CLAUDEBAR_BRANCH_FOR_TESTING
+
 if [[ ! -f "$fixture" ]]; then echo "Missing fixture: $fixture" >&2; exit 2; fi
 if [[ ! -f "$expected" ]]; then echo "Missing expected: $expected" >&2; exit 2; fi
 
