@@ -21,6 +21,14 @@ script="$dir/../statusline.sh"
 : "${CLAUDEBAR_BRANCH_FOR_TESTING:=main}"
 export CLAUDEBAR_NOW_FOR_TESTING CLAUDEBAR_BRANCH_FOR_TESTING
 
+# Compact fixtures: names containing "-compact-" force compact layout
+# regardless of terminal width.
+if [[ "$name" == *-compact-* ]]; then
+    export CLAUDEBAR_LAYOUT=compact
+else
+    export CLAUDEBAR_LAYOUT=full
+fi
+
 if [[ ! -f "$fixture" ]]; then echo "Missing fixture: $fixture" >&2; exit 2; fi
 if [[ ! -f "$expected" ]]; then echo "Missing expected: $expected" >&2; exit 2; fi
 
@@ -34,6 +42,13 @@ else
     echo "0" > "$cache_file"
 fi
 touch "$cache_file"  # ensure mtime is fresh so dirty_count() uses cache (< 5s window)
+
+# Per-fixture branch override (e.g. to test long branch names)
+branch_sidecar="$dir/fixtures/${name}.branch"
+if [[ -f "$branch_sidecar" ]]; then
+    CLAUDEBAR_BRANCH_FOR_TESTING=$(cat "$branch_sidecar")
+    export CLAUDEBAR_BRANCH_FOR_TESTING
+fi
 
 # Unset TMUX so tmux_chip stays empty in integration fixtures — fixture
 # output should be deterministic regardless of whether tests run inside tmux.

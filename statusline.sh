@@ -83,6 +83,19 @@ now_epoch() {
     date +%s
 }
 
+# ─── detect_layout — return "compact" or "full" based on environment ──
+detect_layout() {
+    case "${CLAUDEBAR_LAYOUT:-}" in
+        compact) echo compact; return ;;
+        full)    echo full;    return ;;
+    esac
+    [[ "${MOSHI_CLIENT:-}" == "1" ]] && { echo compact; return; }
+    local cols=${COLUMNS:-0}
+    (( cols == 0 )) && cols=$(tput cols 2>/dev/null || echo 80)
+    (( cols < 60 )) && { echo compact; return; }
+    echo full
+}
+
 # ─── format_countdown SECONDS — magnitude-aware time-until string ──────
 # Returns a 3-6 char ASCII string:
 #   s < 60                 → "now"
@@ -145,6 +158,135 @@ pip_bar() {
     if (( marker_active && marker == 10 )); then
         fg "$C_REPO" "│"
     fi
+}
+
+# ─── pip_bar_compact PCT — 5-pip zone-colored bar (compact layout) ────
+pip_bar_compact() {
+    local pct=$1
+    local color filled i
+    color=$(zone_color "$pct")
+    filled=$(( pct * 5 / 100 ))
+    (( filled > 5 )) && filled=5
+    (( filled < 0 )) && filled=0
+    for ((i=0; i<5; i++)); do
+        if (( i < filled )); then
+            fg "$color" "▰"
+        else
+            fg "$C_BAR_DIM" "▱"
+        fi
+    done
+}
+
+# ─── compact_row1 — session row (model + effort/agent + PR) ──────────
+# Usage: compact_row1 model=X effort=X pr_number=X pr_state=X agent=X
+compact_row1() {
+    local model="" effort="" pr_number="" pr_state="" agent=""
+    local arg
+    for arg in "$@"; do
+        case "$arg" in
+            model=*)      model=${arg#model=} ;;
+            effort=*)     effort=${arg#effort=} ;;
+            pr_number=*)  pr_number=${arg#pr_number=} ;;
+            pr_state=*)   pr_state=${arg#pr_state=} ;;
+            agent=*)      agent=${arg#agent=} ;;
+        esac
+    done
+
+    local sparkle="✦"
+
+    if [[ -n "$agent" ]]; then
+        fg "$C_MODEL_DIM" "${sparkle} ${model}"
+        printf ' '
+        sep "·"
+        printf ' '
+        fg "$C_AGENT" "${GLYPH_GEAR} agent:${agent}"
+        printf '%s[5m' "$esc"
+        fg "$C_AGENT" " ●"
+        printf '%s[25m' "$esc"
+    else
+        fg "$C_MODEL" "${sparkle} ${model}"
+        if [[ -n "$effort" ]]; then
+            printf ' '
+            sep "·"
+            printf ' '
+            effort_chip "$effort"
+        fi
+    fi
+
+    if [[ -n "$pr_number" ]]; then
+        printf '  '
+        pr_chip "$pr_number" "$pr_state"
+    fi
+
+    printf '\n'
+}
+
+# ─── compact_row2 — git context (repo name + branch + dirty) ─────────
+# Usage: compact_row2 repo=X branch=X dirty_count=X
+compact_row2() {
+    local repo="" branch="" dirty_count=""
+    local arg
+    for arg in "$@"; do
+        case "$arg" in
+            repo=*)         repo=${arg#repo=} ;;
+            branch=*)       branch=${arg#branch=} ;;
+            dirty_count=*)  dirty_count=${arg#dirty_count=} ;;
+        esac
+    done
+
+    [[ -z "$repo" ]] && return
+
+    fg "$C_REPO" "$repo"
+    printf ' '
+    sep "›"
+    printf ' '
+    if [[ -n "$branch" ]]; then
+        fg "$C_BRANCH" "${GLYPH_GIT} ${branch}"
+    fi
+    if [[ -n "$dirty_count" ]]; then
+        printf ' '
+        dirty_indicator "$dirty_count"
+    fi
+
+    printf '\n'
+}
+
+# ─── compact_row3 — fuel gauges with 5-pip bars ──────────────────────
+# Usage: compact_row3 ctx=X five_hour=X seven_day=X
+compact_row3() {
+    local ctx="" five_hour="" seven_day=""
+    local arg
+    for arg in "$@"; do
+        case "$arg" in
+            ctx=*)        ctx=${arg#ctx=} ;;
+            five_hour=*)  five_hour=${arg#five_hour=} ;;
+            seven_day=*)  seven_day=${arg#seven_day=} ;;
+        esac
+    done
+
+    : "${ctx:=0}"
+    fg "$C_REPO" "ctx"; printf ' '
+    pip_bar_compact "$ctx"
+    printf ' '
+    fg "$(zone_color "$ctx")" "$(printf '%2d%%' "$ctx")"
+
+    if [[ -n "$five_hour" ]]; then
+        printf '  '
+        fg "$C_REPO" "5h"; printf ' '
+        pip_bar_compact "$five_hour"
+        printf ' '
+        fg "$(zone_color "$five_hour")" "$(printf '%2d%%' "$five_hour")"
+    fi
+
+    if [[ -n "$seven_day" ]]; then
+        printf '  '
+        fg "$C_REPO" "7d"; printf ' '
+        pip_bar_compact "$seven_day"
+        printf ' '
+        fg "$(zone_color "$seven_day")" "$(printf '%2d%%' "$seven_day")"
+    fi
+
+    printf '\n'
 }
 
 # ─── tmux_chip — show tmux session:window.pane when inside tmux ────────
@@ -464,22 +606,43 @@ main() {
     [[ -n "$SEVEN_DAY" ]] && SEVEN_DAY=$(printf '%.0f' "$SEVEN_DAY")
 
     # Render
-    identity_row \
-        model="$MODEL" \
-        effort="$EFFORT" \
-        owner="$OWNER" repo="$REPO" \
-        worktree="$WORKTREE" \
-        branch="$BRANCH" \
-        dirty_count="$DIRTY" \
-        pr_number="$PR_NUMBER" pr_state="$PR_STATE" \
-        agent="$AGENT"
+    local layout
+    layout=$(detect_layout)
 
-    fuel_row \
-        ctx="$CTX" \
-        five_hour="$FIVE_HOUR" \
-        seven_day="$SEVEN_DAY" \
-        five_hour_resets_at="$FIVE_HOUR_RESETS_AT" \
-        seven_day_resets_at="$SEVEN_DAY_RESETS_AT"
+    if [[ "$layout" == "compact" ]]; then
+        compact_row1 \
+            model="$MODEL" \
+            effort="$EFFORT" \
+            pr_number="$PR_NUMBER" pr_state="$PR_STATE" \
+            agent="$AGENT"
+
+        compact_row2 \
+            repo="$REPO" \
+            branch="$BRANCH" \
+            dirty_count="$DIRTY"
+
+        compact_row3 \
+            ctx="$CTX" \
+            five_hour="$FIVE_HOUR" \
+            seven_day="$SEVEN_DAY"
+    else
+        identity_row \
+            model="$MODEL" \
+            effort="$EFFORT" \
+            owner="$OWNER" repo="$REPO" \
+            worktree="$WORKTREE" \
+            branch="$BRANCH" \
+            dirty_count="$DIRTY" \
+            pr_number="$PR_NUMBER" pr_state="$PR_STATE" \
+            agent="$AGENT"
+
+        fuel_row \
+            ctx="$CTX" \
+            five_hour="$FIVE_HOUR" \
+            seven_day="$SEVEN_DAY" \
+            five_hour_resets_at="$FIVE_HOUR_RESETS_AT" \
+            seven_day_resets_at="$SEVEN_DAY_RESETS_AT"
+    fi
 }
 
 # Sourcing guard: only run main when invoked directly
