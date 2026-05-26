@@ -370,6 +370,24 @@ These were considered and **rejected** during brainstorming:
 
 ---
 
+## Layout Detection
+
+`detect_layout()` returns `"compact"` or `"full"` using a 4-layer priority cascade:
+
+| Priority | Signal | Type | Trigger |
+|----------|--------|------|---------|
+| 1 | `CLAUDEBAR_LAYOUT=compact\|full` | Explicit override | User sets in shell profile |
+| 2 | `MOSHI_CLIENT=1` | App signal | Moshi iOS: Settings > Integrations > Export ENV |
+| 3 | `mosh-server` in process tree | Auto-detection | Walks `/proc` ancestry (Linux) with `ps` fallback (macOS) |
+| 4 | `$COLUMNS < 60` | Terminal width | Fallback; unreliable when stdin is a pipe (falls back to terminfo default 80) |
+
+### Limitations
+
+- **SSH-only connections are not auto-detected.** When mosh is unavailable and the connection is pure SSH, layers 2–4 cannot reliably distinguish a mobile client from a desktop client. Use `CLAUDEBAR_LAYOUT=compact` explicitly in these cases.
+- **Layer 4 is best-effort.** The statusline runs as a subprocess with stdin/stdout piped, so `tput cols` returns the terminfo default (80), not the actual terminal width. `$COLUMNS` is only set in interactive shells.
+
+---
+
 ## Future Expansion (post-v1)
 
 Not in this scope, but candidates for v2 if appetite emerges:

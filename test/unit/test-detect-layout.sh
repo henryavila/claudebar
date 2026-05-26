@@ -24,13 +24,26 @@ CLAUDEBAR_LAYOUT=full MOSHI_CLIENT=1 COLUMNS=30 check "CLAUDEBAR_LAYOUT=full ove
 CLAUDEBAR_LAYOUT='' MOSHI_CLIENT=1 COLUMNS=200 check "MOSHI_CLIENT=1 on wide terminal" compact
 CLAUDEBAR_LAYOUT='' MOSHI_CLIENT=0 COLUMNS=200 check "MOSHI_CLIENT=0 is not a trigger" full
 
-# 3. COLUMNS detection
+# 3. mosh-server process tree detection
+_is_mosh_session() { return 0; }  # mock: in mosh
+CLAUDEBAR_LAYOUT='' MOSHI_CLIENT='' COLUMNS=200 check "mosh-server ancestor → compact (wide terminal)" compact
+CLAUDEBAR_LAYOUT='' MOSHI_CLIENT='' COLUMNS=80 check "mosh-server ancestor → compact (standard terminal)" compact
+
+_is_mosh_session() { return 1; }  # mock: not in mosh
+CLAUDEBAR_LAYOUT='' MOSHI_CLIENT='' COLUMNS=200 check "no mosh ancestor + wide → full" full
+
+# explicit overrides beat mosh detection
+_is_mosh_session() { return 0; }
+CLAUDEBAR_LAYOUT=full MOSHI_CLIENT='' COLUMNS=80 check "CLAUDEBAR_LAYOUT=full overrides mosh detection" full
+_is_mosh_session() { return 1; }
+
+# 4. COLUMNS detection
 CLAUDEBAR_LAYOUT='' MOSHI_CLIENT='' COLUMNS=45 check "COLUMNS=45 → compact" compact
 CLAUDEBAR_LAYOUT='' MOSHI_CLIENT='' COLUMNS=59 check "COLUMNS=59 → compact" compact
 CLAUDEBAR_LAYOUT='' MOSHI_CLIENT='' COLUMNS=60 check "COLUMNS=60 → full" full
 CLAUDEBAR_LAYOUT='' MOSHI_CLIENT='' COLUMNS=100 check "COLUMNS=100 → full" full
 
-# 4. Default (wide terminal)
+# 5. Default (wide terminal)
 CLAUDEBAR_LAYOUT='' MOSHI_CLIENT='' COLUMNS=80 check "default wide → full" full
 
 if (( fail == 0 )); then echo "PASS: detect_layout"; exit 0

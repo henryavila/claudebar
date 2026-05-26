@@ -83,6 +83,30 @@ now_epoch() {
     date +%s
 }
 
+# ─── _is_mosh_session — walk process tree for mosh-server ancestor ────
+# Returns 0 (true) when any ancestor process is mosh-server.
+# Uses /proc on Linux with ps fallback for portability.
+_is_mosh_session() {
+    local pid=$$
+    while (( pid > 1 )); do
+        local name
+        if [[ -r "/proc/$pid/comm" ]]; then
+            name=$(< /proc/$pid/comm)
+        else
+            name=$(ps -o comm= -p "$pid" 2>/dev/null) || break
+        fi
+        [[ "$name" == "mosh-server" ]] && return 0
+        local next_pid
+        if [[ -r "/proc/$pid/status" ]]; then
+            next_pid=$(awk '/^PPid:/ {print $2}' /proc/$pid/status)
+        else
+            next_pid=$(ps -o ppid= -p "$pid" 2>/dev/null | tr -d ' ') || break
+        fi
+        pid=${next_pid:-0}
+    done
+    return 1
+}
+
 # ─── detect_layout — return "compact" or "full" based on environment ──
 detect_layout() {
     case "${CLAUDEBAR_LAYOUT:-}" in
@@ -90,6 +114,7 @@ detect_layout() {
         full)    echo full;    return ;;
     esac
     [[ "${MOSHI_CLIENT:-}" == "1" ]] && { echo compact; return; }
+    _is_mosh_session && { echo compact; return; }
     local cols=${COLUMNS:-0}
     (( cols == 0 )) && cols=$(tput cols 2>/dev/null || echo 80)
     (( cols < 60 )) && { echo compact; return; }
