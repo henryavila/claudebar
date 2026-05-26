@@ -177,6 +177,118 @@ pip_bar_compact() {
     done
 }
 
+# ─── compact_row1 — session row (model + effort/agent + PR) ──────────
+# Usage: compact_row1 model=X effort=X pr_number=X pr_state=X agent=X
+compact_row1() {
+    local model="" effort="" pr_number="" pr_state="" agent=""
+    local arg
+    for arg in "$@"; do
+        case "$arg" in
+            model=*)      model=${arg#model=} ;;
+            effort=*)     effort=${arg#effort=} ;;
+            pr_number=*)  pr_number=${arg#pr_number=} ;;
+            pr_state=*)   pr_state=${arg#pr_state=} ;;
+            agent=*)      agent=${arg#agent=} ;;
+        esac
+    done
+
+    local sparkle="✦"
+
+    if [[ -n "$agent" ]]; then
+        fg "$C_MODEL_DIM" "${sparkle} ${model}"
+        printf ' '
+        sep "·"
+        printf ' '
+        fg "$C_AGENT" "${GLYPH_GEAR} agent:${agent}"
+        printf '%s[5m' "$esc"
+        fg "$C_AGENT" " ●"
+        printf '%s[25m' "$esc"
+    else
+        fg "$C_MODEL" "${sparkle} ${model}"
+        if [[ -n "$effort" ]]; then
+            printf ' '
+            sep "·"
+            printf ' '
+            effort_chip "$effort"
+        fi
+    fi
+
+    if [[ -n "$pr_number" ]]; then
+        printf '  '
+        pr_chip "$pr_number" "$pr_state"
+    fi
+
+    printf '\n'
+}
+
+# ─── compact_row2 — git context (repo name + branch + dirty) ─────────
+# Usage: compact_row2 repo=X branch=X dirty_count=X
+compact_row2() {
+    local repo="" branch="" dirty_count=""
+    local arg
+    for arg in "$@"; do
+        case "$arg" in
+            repo=*)         repo=${arg#repo=} ;;
+            branch=*)       branch=${arg#branch=} ;;
+            dirty_count=*)  dirty_count=${arg#dirty_count=} ;;
+        esac
+    done
+
+    [[ -z "$repo" ]] && { printf '\n'; return; }
+
+    fg "$C_REPO" "$repo"
+    printf ' '
+    sep "›"
+    printf ' '
+    if [[ -n "$branch" ]]; then
+        fg "$C_BRANCH" "${GLYPH_GIT} ${branch}"
+    fi
+    if [[ -n "$dirty_count" ]]; then
+        printf ' '
+        dirty_indicator "$dirty_count"
+    fi
+
+    printf '\n'
+}
+
+# ─── compact_row3 — fuel gauges with 5-pip bars ──────────────────────
+# Usage: compact_row3 ctx=X five_hour=X seven_day=X
+compact_row3() {
+    local ctx="" five_hour="" seven_day=""
+    local arg
+    for arg in "$@"; do
+        case "$arg" in
+            ctx=*)        ctx=${arg#ctx=} ;;
+            five_hour=*)  five_hour=${arg#five_hour=} ;;
+            seven_day=*)  seven_day=${arg#seven_day=} ;;
+        esac
+    done
+
+    : "${ctx:=0}"
+    fg "$C_REPO" "ctx"; printf ' '
+    pip_bar_compact "$ctx"
+    printf ' '
+    fg "$(zone_color "$ctx")" "$(printf '%2d%%' "$ctx")"
+
+    if [[ -n "$five_hour" ]]; then
+        printf '  '
+        fg "$C_REPO" "5h"; printf ' '
+        pip_bar_compact "$five_hour"
+        printf ' '
+        fg "$(zone_color "$five_hour")" "$(printf '%2d%%' "$five_hour")"
+    fi
+
+    if [[ -n "$seven_day" ]]; then
+        printf '  '
+        fg "$C_REPO" "7d"; printf ' '
+        pip_bar_compact "$seven_day"
+        printf ' '
+        fg "$(zone_color "$seven_day")" "$(printf '%2d%%' "$seven_day")"
+    fi
+
+    printf '\n'
+}
+
 # ─── tmux_chip — show tmux session:window.pane when inside tmux ────────
 # Reads $TMUX (set by tmux server) + queries tmux for display info.
 # Returns empty when not in tmux or tmux command fails.
