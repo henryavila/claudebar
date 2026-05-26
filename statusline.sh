@@ -30,6 +30,24 @@ readonly C_AGENT=141
 readonly C_TMUX=105
 readonly C_SEP=238
 
+# ─── Nerd Font glyphs (Private Use Area, U+E000-F8FF) ─────────────────
+# Constructed from UTF-8 byte escapes (NOT literal chars) — Private Use
+# Area chars get silently stripped by some editors/transports that normalize
+# Unicode. Keeping the source ASCII-only insulates against that whole class
+# of bug. Bash reconstructs the multibyte sequence at runtime.
+#
+# Glyph names and codepoints:
+#   GLYPH_PENCIL  U+F040  nf-fa-pencil           — dirty file indicator
+#   GLYPH_GIT     U+E725  devicons-git-branch    — branch label
+#   GLYPH_PR      U+F407  nf-fa-code-pull-req    — PR chip
+#   GLYPH_TMUX    U+F1B2  nf-fa-cube             — tmux session chip
+#   GLYPH_GEAR    U+F085  nf-fa-cogs             — agent-active chip
+readonly GLYPH_PENCIL=$'\xef\x81\x80'
+readonly GLYPH_GIT=$'\xee\x9c\xa5'
+readonly GLYPH_PR=$'\xef\x90\x87'
+readonly GLYPH_TMUX=$'\xef\x86\xb2'
+readonly GLYPH_GEAR=$'\xef\x82\x85'
+
 # ─── ANSI helpers ──────────────────────────────────────────────────────
 esc=$'\033'
 fg() { printf '%s[38;5;%dm%s%s[0m' "$esc" "$1" "$2" "$esc"; }
@@ -60,14 +78,14 @@ pip_bar() {
 # ─── tmux_chip — show tmux session:window.pane when inside tmux ────────
 # Reads $TMUX (set by tmux server) + queries tmux for display info.
 # Returns empty when not in tmux or tmux command fails.
-# Glyph:  (U+F1B2 nf-fa-cube), 1-cell wide in Nerd Fonts.
+# Uses GLYPH_TMUX (declared at top).
 tmux_chip() {
     [[ -z "${TMUX:-}" ]] && return 0
     have tmux || return 0
     local context
     context=$(tmux display-message -p '#S:#I.#P' 2>/dev/null) || return 0
     [[ -z "$context" ]] && return 0
-    fg "$C_TMUX" " ${context}"
+    fg "$C_TMUX" "${GLYPH_TMUX} ${context}"
 }
 
 # ─── effort_chip LEVEL — colored text chip per effort level ────────────
@@ -84,17 +102,16 @@ effort_chip() {
 }
 
 # ─── pr_chip NUMBER STATE — colored PR chip with state glyph ───────────
-# Glyph: nf-fa-code-pull-request (U+F407) ""
+# Uses GLYPH_PR (declared at top).
 pr_chip() {
     local number=$1 state=$2
-    local pr_glyph=$''
     case "$state" in
-        pending)           fg "$C_PR_PENDING"  "${pr_glyph} #${number} ⏳" ;;
-        approved)          fg "$C_PR_APPROVED" "${pr_glyph} #${number} ✓" ;;
-        changes_requested) fg "$C_PR_CHANGES"  "${pr_glyph} #${number} ✗" ;;
-        draft)             fg "$C_PR_DRAFT"    "${pr_glyph} #${number} ◯" ;;
-        "")                fg "$C_PR_PENDING"  "${pr_glyph} #${number}" ;;
-        *)                 fg "$C_PR_PENDING"  "${pr_glyph} #${number}" ;;
+        pending)           fg "$C_PR_PENDING"  "${GLYPH_PR} #${number} ⏳" ;;
+        approved)          fg "$C_PR_APPROVED" "${GLYPH_PR} #${number} ✓" ;;
+        changes_requested) fg "$C_PR_CHANGES"  "${GLYPH_PR} #${number} ✗" ;;
+        draft)             fg "$C_PR_DRAFT"    "${GLYPH_PR} #${number} ◯" ;;
+        "")                fg "$C_PR_PENDING"  "${GLYPH_PR} #${number}" ;;
+        *)                 fg "$C_PR_PENDING"  "${GLYPH_PR} #${number}" ;;
     esac
 }
 
@@ -130,25 +147,17 @@ dirty_count() {
     cat "$cache"
 }
 
-# ─── dirty_indicator N — render edit-pencil + count, or ✓ when clean ─
-# Notes:
-#   - U+270E ✎ (Dingbats) renders emoji-wide (2 cells) in some terminals,
-#     causing the count digit to overlap the icon. Avoid.
-#   - Nerd Font glyphs (U+E000-F8FF private use) are guaranteed 1-cell but
-#     may be stripped by source-file editors that normalize that range.
-#     We build the glyph from UTF-8 byte escapes so the source stays ASCII
-#     and the icon is reconstructed at runtime.
-#   - PENCIL_GLYPH = U+F040 (nf-fa-pencil) in bytes: 0xEF 0x81 0x80.
-#   - Space between glyph and count is intentional — defensive separation
-#     in case some terminal/font renders the glyph at >1 cell.
-readonly PENCIL_GLYPH=$'\xef\x81\x80'
+# ─── dirty_indicator N — pencil + count when dirty, ✓ when clean ─────
+# Uses GLYPH_PENCIL (declared at top). Space between glyph and count is
+# intentional — defensive separation in case some terminal renders the
+# glyph at >1 cell width.
 dirty_indicator() {
     local count=$1
     if [[ -z "$count" ]]; then
         return 0  # not a git repo → nothing
     fi
     if (( count > 0 )); then
-        fg "$C_DIRTY" "${PENCIL_GLYPH} ${count}"
+        fg "$C_DIRTY" "${GLYPH_PENCIL} ${count}"
     else
         fg "$C_CLEAN" "✓"
     fi
@@ -180,8 +189,7 @@ identity_row() {
     done
 
     local sparkle="✦"
-    local git_glyph=$''   # nf-fa-code-fork
-    local wt_glyph=$'⎇'
+    local wt_glyph=$'\xe2\x8e\x87'   # U+2387 ⎇ alternative-key — NOT private use, but kept as bytes for consistency
 
     # ── Left group: model + (effort | agent) ─────────────
     if [[ -n "$agent" ]]; then
@@ -189,7 +197,8 @@ identity_row() {
         printf ' '
         sep "·"
         printf ' '
-        fg "$C_AGENT" "${git_glyph} agent:${agent}"
+        # Agent chip uses GEAR (cogs), distinct from git branch glyph
+        fg "$C_AGENT" "${GLYPH_GEAR} agent:${agent}"
         printf '%s[5m' "$esc"  # blink on
         fg "$C_AGENT" " ●"
         printf '%s[25m' "$esc"  # blink off
@@ -224,7 +233,7 @@ identity_row() {
             fg "$C_WORKTREE" "${wt_glyph} "
         fi
         if [[ -n "$branch" ]]; then
-            fg "$C_BRANCH" "${git_glyph} ${branch}"
+            fg "$C_BRANCH" "${GLYPH_GIT} ${branch}"
         fi
         if [[ -n "$dirty_count" ]]; then
             printf ' '

@@ -1,5 +1,5 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="548" height="94" font-family="JetBrains Mono, Fira Code, Menlo, Consolas, monospace" font-size="14">
-<rect width="548" height="94" rx="6" fill="#1e1e2e"/>
+<svg xmlns="http://www.w3.org/2000/svg" width="556" height="94" font-family="JetBrains Mono, Fira Code, Menlo, Consolas, monospace" font-size="14">
+<rect width="556" height="94" rx="6" fill="#1e1e2e"/>
 <text x="16" y="28" fill="#888" font-size="11" font-style="italic">Mid-session — worktree work in progress</text>
 <text x="16.0" y="54.0" fill="#ff87ff" xml:space="preserve">✦ Opus 4.7</text>
 <text x="102.0" y="54.0" fill="#e0e0e0" xml:space="preserve"> </text>
@@ -12,11 +12,11 @@
 <text x="317.0" y="54.0" fill="#444444" xml:space="preserve">›</text>
 <text x="325.6" y="54.0" fill="#e0e0e0" xml:space="preserve"> </text>
 <text x="334.2" y="54.0" fill="#afafff" xml:space="preserve">⎇ </text>
-<text x="351.4" y="54.0" fill="#5fd700" xml:space="preserve"> main</text>
-<text x="394.4" y="54.0" fill="#e0e0e0" xml:space="preserve"> </text>
-<text x="403.0" y="54.0" fill="#d7af00" xml:space="preserve"> 3</text>
-<text x="428.8" y="54.0" fill="#e0e0e0" xml:space="preserve">   </text>
-<text x="454.6" y="54.0" fill="#ffd700" xml:space="preserve"> #1234 ⏳</text>
+<text x="351.4" y="54.0" fill="#5fd700" xml:space="preserve"> main</text>
+<text x="403.0" y="54.0" fill="#e0e0e0" xml:space="preserve"> </text>
+<text x="411.6" y="54.0" fill="#d7af00" xml:space="preserve"> 3</text>
+<text x="437.4" y="54.0" fill="#e0e0e0" xml:space="preserve">   </text>
+<text x="463.2" y="54.0" fill="#ffd700" xml:space="preserve"> #1234 ⏳</text>
 <text x="16.0" y="74.0" fill="#8a8a8a" xml:space="preserve">ctx</text>
 <text x="41.8" y="74.0" fill="#e0e0e0" xml:space="preserve"> </text>
 <text x="50.4" y="74.0" fill="#5fd700" xml:space="preserve">▰</text>
