@@ -21,6 +21,14 @@ script="$dir/../statusline.sh"
 : "${CLAUDEBAR_BRANCH_FOR_TESTING:=main}"
 export CLAUDEBAR_NOW_FOR_TESTING CLAUDEBAR_BRANCH_FOR_TESTING
 
+# Compact fixtures: names containing "-compact-" force compact layout
+# regardless of terminal width.
+if [[ "$name" == *-compact-* ]]; then
+    export CLAUDEBAR_LAYOUT=compact
+else
+    export CLAUDEBAR_LAYOUT=full
+fi
+
 if [[ ! -f "$fixture" ]]; then echo "Missing fixture: $fixture" >&2; exit 2; fi
 if [[ ! -f "$expected" ]]; then echo "Missing expected: $expected" >&2; exit 2; fi
 
