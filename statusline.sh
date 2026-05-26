@@ -30,6 +30,14 @@ readonly C_AGENT=141
 readonly C_TMUX=105
 readonly C_SEP=238
 
+# ─── Quota window durations (seconds) — used by the time-elapsed marker ─
+# Anthropic's rate-limit windows are nominally 5 hours and 7 days. We pin
+# the durations here so the marker position is deterministic; the exact
+# rolling-window semantics aren't public but a fixed denominator is a good
+# enough approximation for "am I burning faster than time?" reading.
+readonly WINDOW_5H_SECONDS=18000
+readonly WINDOW_7D_SECONDS=604800
+
 # ─── Nerd Font glyphs (Private Use Area, U+E000-F8FF) ─────────────────
 # Constructed from UTF-8 byte escapes (NOT literal chars) — Private Use
 # Area chars get silently stripped by some editors/transports that normalize
@@ -320,15 +328,23 @@ identity_row() {
 
 # ─── fuel_row — compose row 2 (the 3 bars) ────────────────────────────
 # Usage: fuel_row key=value key=value ...
-# Keys: ctx five_hour seven_day
+# Keys: ctx five_hour seven_day five_hour_resets_at seven_day_resets_at
+#
+# When a *_resets_at kwarg is a positive Unix timestamp, the chip renders
+# "label · countdown  bar pct%" (dim countdown + 2-space gap visually
+# clusters [label · countdown] as metadata vs [bar pct%] as the metric).
+# When absent / zero / non-numeric, falls back to "label bar pct%".
 fuel_row() {
     local ctx="" five_hour="" seven_day=""
+    local five_hour_resets_at="" seven_day_resets_at=""
     local arg
     for arg in "$@"; do
         case "$arg" in
-            ctx=*)        ctx=${arg#ctx=} ;;
-            five_hour=*)  five_hour=${arg#five_hour=} ;;
-            seven_day=*)  seven_day=${arg#seven_day=} ;;
+            ctx=*)                  ctx=${arg#ctx=} ;;
+            five_hour=*)            five_hour=${arg#five_hour=} ;;
+            seven_day=*)            seven_day=${arg#seven_day=} ;;
+            five_hour_resets_at=*)  five_hour_resets_at=${arg#five_hour_resets_at=} ;;
+            seven_day_resets_at=*)  seven_day_resets_at=${arg#seven_day_resets_at=} ;;
         esac
     done
 
@@ -342,8 +358,21 @@ fuel_row() {
     # 5h
     if [[ -n "$five_hour" ]]; then
         printf '   '
-        fg "$C_REPO" "5h"; printf '  '
-        pip_bar "$five_hour"
+        fg "$C_REPO" "5h"; printf ' '
+        local marker_5h=""
+        if [[ "$five_hour_resets_at" =~ ^[0-9]+$ ]] && (( five_hour_resets_at > 0 )); then
+            local now_5h countdown_5h elapsed_5h remaining_5h
+            now_5h=$(now_epoch)
+            remaining_5h=$(( five_hour_resets_at - now_5h ))
+            countdown_5h=$(format_countdown "$remaining_5h")
+            fg "$C_REPO" "·"; printf ' '
+            fg "$C_REPO" "$countdown_5h"; printf '  '
+            elapsed_5h=$(( WINDOW_5H_SECONDS - remaining_5h ))
+            (( elapsed_5h < 0 )) && elapsed_5h=0
+            (( elapsed_5h > WINDOW_5H_SECONDS )) && elapsed_5h=WINDOW_5H_SECONDS
+            marker_5h=$(( elapsed_5h * 10 / WINDOW_5H_SECONDS ))
+        fi
+        pip_bar "$five_hour" "$marker_5h"
         printf ' '
         fg "$(zone_color "$five_hour")" "$(printf '%2d%%' "$five_hour")"
     fi
@@ -351,8 +380,21 @@ fuel_row() {
     # 7d
     if [[ -n "$seven_day" ]]; then
         printf '   '
-        fg "$C_REPO" "7d"; printf '  '
-        pip_bar "$seven_day"
+        fg "$C_REPO" "7d"; printf ' '
+        local marker_7d=""
+        if [[ "$seven_day_resets_at" =~ ^[0-9]+$ ]] && (( seven_day_resets_at > 0 )); then
+            local now_7d countdown_7d elapsed_7d remaining_7d
+            now_7d=$(now_epoch)
+            remaining_7d=$(( seven_day_resets_at - now_7d ))
+            countdown_7d=$(format_countdown "$remaining_7d")
+            fg "$C_REPO" "·"; printf ' '
+            fg "$C_REPO" "$countdown_7d"; printf '  '
+            elapsed_7d=$(( WINDOW_7D_SECONDS - remaining_7d ))
+            (( elapsed_7d < 0 )) && elapsed_7d=0
+            (( elapsed_7d > WINDOW_7D_SECONDS )) && elapsed_7d=WINDOW_7D_SECONDS
+            marker_7d=$(( elapsed_7d * 10 / WINDOW_7D_SECONDS ))
+        fi
+        pip_bar "$seven_day" "$marker_7d"
         printf ' '
         fg "$(zone_color "$seven_day")" "$(printf '%2d%%' "$seven_day")"
     fi
@@ -391,8 +433,10 @@ main() {
         "REPO="       + ((.workspace.repo.name // "") | @sh) + "\n" +
         "WORKTREE="   + ((.workspace.git_worktree // "") | @sh) + "\n" +
         "CTX="        + ((.context_window.used_percentage // 0 | floor) | tostring | @sh) + "\n" +
-        "FIVE_HOUR="  + ((.rate_limits.five_hour.used_percentage // "") | tostring | @sh) + "\n" +
-        "SEVEN_DAY="  + ((.rate_limits.seven_day.used_percentage // "") | tostring | @sh) + "\n" +
+        "FIVE_HOUR="            + ((.rate_limits.five_hour.used_percentage // "") | tostring | @sh) + "\n" +
+        "FIVE_HOUR_RESETS_AT="  + ((.rate_limits.five_hour.resets_at // "") | tostring | @sh) + "\n" +
+        "SEVEN_DAY="            + ((.rate_limits.seven_day.used_percentage // "") | tostring | @sh) + "\n" +
+        "SEVEN_DAY_RESETS_AT="  + ((.rate_limits.seven_day.resets_at // "") | tostring | @sh) + "\n" +
         "PR_NUMBER="  + ((.pr.number // "") | tostring | @sh) + "\n" +
         "PR_STATE="   + ((.pr.review_state // "") | @sh) + "\n" +
         "AGENT="      + ((.agent.name // "") | @sh)
@@ -400,8 +444,12 @@ main() {
     eval "$jq_out"
 
     # Derive branch (not in JSON for normal sessions — git is source of truth)
+    # CLAUDEBAR_BRANCH_FOR_TESTING overrides the git lookup so fixture snapshots
+    # stay reproducible regardless of which branch the test runner is sitting on.
     local BRANCH=""
-    if have git && git rev-parse --git-dir >/dev/null 2>&1; then
+    if [[ -n "${CLAUDEBAR_BRANCH_FOR_TESTING:-}" ]]; then
+        BRANCH=$CLAUDEBAR_BRANCH_FOR_TESTING
+    elif have git && git rev-parse --git-dir >/dev/null 2>&1; then
         BRANCH=$(git branch --show-current 2>/dev/null || echo "")
     fi
 
@@ -429,7 +477,9 @@ main() {
     fuel_row \
         ctx="$CTX" \
         five_hour="$FIVE_HOUR" \
-        seven_day="$SEVEN_DAY"
+        seven_day="$SEVEN_DAY" \
+        five_hour_resets_at="$FIVE_HOUR_RESETS_AT" \
+        seven_day_resets_at="$SEVEN_DAY_RESETS_AT"
 }
 
 # Sourcing guard: only run main when invoked directly

@@ -1,0 +1,14 @@
+{
+  "session_id": "test-16",
+  "model": {"id": "claude-opus-4-7", "display_name": "Opus 4.7"},
+  "workspace": {
+    "current_dir": "/home/henry/arch",
+    "repo": {"host": "github.com", "owner": "henryavila", "name": "arch"}
+  },
+  "effort": {"level": "max"},
+  "context_window": {"used_percentage": 88},
+  "rate_limits": {
+    "five_hour": {"used_percentage": 92, "resets_at": 1830000720},
+    "seven_day": {"used_percentage": 88, "resets_at": 1830014400}
+  }
+}
