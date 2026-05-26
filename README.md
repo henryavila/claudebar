@@ -51,7 +51,7 @@ Fuel-gauge row (bottom) — *how much runway do I have?*
 ### Quick: one-shot installer
 
 ```bash
-git clone https://github.com/<your-username>/claudebar.git ~/claudebar
+git clone https://github.com/henryavila/claudebar.git ~/claudebar
 ~/claudebar/install.sh
 ```
 
