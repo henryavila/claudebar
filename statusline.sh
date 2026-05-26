@@ -129,6 +129,83 @@ dirty_indicator() {
     fi
 }
 
+# ─── identity_row — compose row 1 ─────────────────────────────────────
+# Usage: identity_row key=value key=value ...
+# Keys: model effort owner repo worktree branch dirty_count
+#       pr_number pr_state agent
+identity_row() {
+    local model="" effort="" owner="" repo=""
+    local worktree="" branch="" dirty_count=""
+    local pr_number="" pr_state="" agent=""
+
+    local arg
+    for arg in "$@"; do
+        case "$arg" in
+            model=*)        model=${arg#model=} ;;
+            effort=*)       effort=${arg#effort=} ;;
+            owner=*)        owner=${arg#owner=} ;;
+            repo=*)         repo=${arg#repo=} ;;
+            worktree=*)     worktree=${arg#worktree=} ;;
+            branch=*)       branch=${arg#branch=} ;;
+            dirty_count=*)  dirty_count=${arg#dirty_count=} ;;
+            pr_number=*)    pr_number=${arg#pr_number=} ;;
+            pr_state=*)     pr_state=${arg#pr_state=} ;;
+            agent=*)        agent=${arg#agent=} ;;
+        esac
+    done
+
+    local sparkle="✦"
+    local git_glyph=$''   # nf-fa-code-fork
+    local wt_glyph=$'⎇'
+
+    # ── Left group: model + (effort | agent) ─────────────
+    if [[ -n "$agent" ]]; then
+        fg "$C_MODEL_DIM" "${sparkle} ${model}"
+        printf ' '
+        sep "·"
+        printf ' '
+        fg "$C_AGENT" "${git_glyph} agent:${agent}"
+        printf '%s[5m' "$esc"  # blink on
+        fg "$C_AGENT" " ●"
+        printf '%s[25m' "$esc"  # blink off
+    else
+        fg "$C_MODEL" "${sparkle} ${model}"
+        if [[ -n "$effort" ]]; then
+            printf ' '
+            sep "·"
+            printf ' '
+            effort_chip "$effort"
+        fi
+    fi
+
+    # ── Middle group: repo › [⎇ ]branch dirty ────────────
+    if [[ -n "$owner" && -n "$repo" ]]; then
+        printf '  '
+        fg "$C_REPO" "${owner}/${repo}"
+        printf ' '
+        sep "›"
+        printf ' '
+        if [[ -n "$worktree" ]]; then
+            fg "$C_WORKTREE" "${wt_glyph} "
+        fi
+        if [[ -n "$branch" ]]; then
+            fg "$C_BRANCH" "${git_glyph} ${branch}"
+        fi
+        if [[ -n "$dirty_count" ]]; then
+            printf ' '
+            dirty_indicator "$dirty_count"
+        fi
+    fi
+
+    # ── Right group: PR chip ─────────────────────────────
+    if [[ -n "$pr_number" ]]; then
+        printf '   '
+        pr_chip "$pr_number" "$pr_state"
+    fi
+
+    printf '\n'
+}
+
 minimal_fallback() {
     # Read stdin with grep (no jq) to extract just the model name
     local input model dir
