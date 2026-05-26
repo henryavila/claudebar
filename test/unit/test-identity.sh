@@ -16,7 +16,7 @@ out=$(identity_row \
     pr_number=1234 pr_state=pending \
     agent="")
 
-want_substrings=("Opus 4.7" "HIGH" "henryavila/arch" "⎇" "feature/filament-v4-migration" "✎3" "#1234")
+want_substrings=("Opus 4.7" "HIGH" "henryavila/arch" "⎇" "feature/filament-v4-migration" " 3" "#1234")
 for s in "${want_substrings[@]}"; do
     if [[ "$out" != *"$s"* ]]; then
         echo "  FAIL: normal identity_row missing '$s'"; fail=1
