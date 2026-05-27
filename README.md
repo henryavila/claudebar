@@ -1,5 +1,10 @@
 # claudebar
 
+[![npm version](https://img.shields.io/npm/v/@henryavila/claudebar)](https://www.npmjs.com/package/@henryavila/claudebar)
+[![npm downloads](https://img.shields.io/npm/dm/@henryavila/claudebar)](https://www.npmjs.com/package/@henryavila/claudebar)
+[![license](https://img.shields.io/npm/l/@henryavila/claudebar)](LICENSE)
+[![node](https://img.shields.io/node/v/@henryavila/claudebar)](package.json)
+
 A two-row, zone-driven statusline for [Claude Code](https://docs.claude.com/en/docs/claude-code/overview). Designed for the subscriber tier: rate-limit awareness matters more than dollar cost.
 
 <p align="center">
