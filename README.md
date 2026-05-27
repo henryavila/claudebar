@@ -112,6 +112,46 @@ Total exec time on warm cache: <50 ms (measured with `time` over 10 runs on a ty
 
 See [`DESIGN.md`](DESIGN.md) for the full spec, [`PLAN.md`](PLAN.md) for the original implementation plan, and [`CHANGELOG.md`](CHANGELOG.md) for version history.
 
+## Mobile / compact layout
+
+On narrow terminals or mobile connections, claudebar switches to a 3-row compact layout with 5-pip bars:
+
+```
+✦ Opus 4.7 · HIGH  #4 ⏳
+claudebar ›  main ✓
+ctx ▰▱▱▱▱  12%  5h ▰▱▱▱▱  18%  7d ▰▰▱▱▱  45%
+```
+
+### Automatic detection
+
+When connecting via **mosh** (e.g., [Moshi](https://apps.apple.com/app/id1122890360) on iOS), compact layout activates automatically — the script detects `mosh-server` in the process tree.
+
+**Moshi iOS setup:** Go to **Settings > Integrations > Export ENV** and enable `MOSHI_CLIENT`. This ensures detection even if the process-tree walk is blocked.
+
+### Other mobile SSH apps
+
+If you use a different mobile terminal app (Termius, Blink, Prompt, etc.) that connects via **plain SSH** (no mosh), automatic detection is not possible — the SSH protocol does not expose client identity to the server.
+
+Set the override in your remote shell profile (`~/.bashrc`, `~/.zshrc`, etc.):
+
+```bash
+# Force compact layout for mobile sessions
+export CLAUDEBAR_LAYOUT=compact
+```
+
+Or, if you want it conditional (e.g., only when SSHing from your phone), set it in the app's SSH environment/startup command rather than globally.
+
+### Detection priority
+
+| Priority | Signal | How to use |
+|----------|--------|------------|
+| 1 | `CLAUDEBAR_LAYOUT=compact` | `export` in shell profile or app SSH config |
+| 2 | `MOSHI_CLIENT=1` | Enable in Moshi iOS settings |
+| 3 | `mosh-server` ancestor process | Automatic (mosh connections) |
+| 4 | `$COLUMNS < 60` | Automatic (very narrow terminals) |
+
+To force **full** layout on a mosh session: `export CLAUDEBAR_LAYOUT=full`.
+
 ## Customizing colors
 
 Open `statusline.sh` and edit the `# ─── Palette` block near the top — every color is a 256-color code. Want a teal `MED` chip? Change `readonly C_EFFORT_MED=39` to your preferred code. Want narrower thresholds? Edit `zone_color()`.
