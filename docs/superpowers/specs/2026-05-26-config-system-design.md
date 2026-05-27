@@ -175,8 +175,82 @@ Diagnose the installation. Reports pass/fail for each check.
 | 7 | `config.sh` up to date | `config.sh: current` | `config.sh stale — recompiling...` (auto-fix) |
 | 8 | `settings.json` points to script | `statusLine → ~/.config/claudebar/statusline.sh` | `statusLine missing or wrong path` |
 | 9 | Version match | `v1.2.0 (latest)` | `v1.1.0 installed, v1.2.0 available — run: npx @henryavila/claudebar update` |
+| 10 | Nerd Font installed | `NerdFont: JetBrainsMono Nerd Font` | `NerdFont not detected — run: npx @henryavila/claudebar install-font` |
 
 **Exit code:** 0 if all pass, 1 if any fail.
+
+### `npx @henryavila/claudebar install-font [--font <name>]`
+
+Install a Nerd Font so claudebar glyphs render correctly. Defaults to `JetBrainsMono` if
+`--font` is omitted. Accepts any font name from the [ryanoasis/nerd-fonts](https://github.com/ryanoasis/nerd-fonts) releases (e.g., `FiraCode`, `Hack`, `CascadiaCode`).
+
+**Platform detection** (evaluated top-to-bottom, first match wins):
+
+| Condition | Platform | Install strategy |
+|---|---|---|
+| `$WSL_DISTRO_NAME` set or `/proc/version` contains `microsoft` | WSL2 | PowerShell on Windows host |
+| `uname -s` = `Darwin` | macOS | Homebrew cask |
+| `uname -s` = `Linux` | Linux native | Download to `~/.local/share/fonts/` |
+
+**Steps per platform:**
+
+#### macOS
+
+1. Check if Homebrew is available (`command -v brew`). If not: print install hint and abort.
+2. Derive cask name: `font-<lower-kebab>-nerd-font` (e.g., `font-jetbrains-mono-nerd-font`).
+3. `brew install --cask <cask>`.
+4. Verify: `fc-list | grep -i "<font name>"`. Print success or failure.
+5. Remind user to select the font in their terminal app.
+
+#### Linux native (Ubuntu/Debian/Arch/Fedora)
+
+1. Determine latest release tag from GitHub API:
+   `curl -sL https://api.github.com/repos/ryanoasis/nerd-fonts/releases/latest | jq -r .tag_name`
+2. Download the font zip:
+   `curl -fLO https://github.com/ryanoasis/nerd-fonts/releases/download/<tag>/<FontName>.zip`
+3. Create `~/.local/share/fonts/<FontName>/` and unzip into it.
+4. Run `fc-cache -fv`.
+5. Verify: `fc-list | grep -i "<FontName>"`. Print success or failure.
+6. Clean up downloaded zip.
+7. Remind user to select the font in their terminal app.
+
+#### WSL2
+
+Fonts must be installed on the **Windows host** — the terminal emulator (Windows Terminal, etc.)
+renders glyphs using Windows-side fonts.
+
+1. Detect PowerShell path: `powershell.exe` or `/mnt/c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe`.
+2. Download via PowerShell:
+   ```
+   powershell.exe -Command "& {
+     $tag = (Invoke-RestMethod 'https://api.github.com/repos/ryanoasis/nerd-fonts/releases/latest').tag_name;
+     $url = \"https://github.com/ryanoasis/nerd-fonts/releases/download/$tag/<FontName>.zip\";
+     $zip = \"$env:TEMP\\<FontName>.zip\";
+     Invoke-WebRequest -Uri $url -OutFile $zip;
+     Expand-Archive -Path $zip -DestinationPath \"$env:TEMP\\<FontName>\" -Force;
+     $fonts = (New-Object -ComObject Shell.Application).Namespace(0x14);
+     Get-ChildItem \"$env:TEMP\\<FontName>\\*.ttf\" | ForEach-Object { $fonts.CopyHere($_.FullName, 0x10) };
+     Remove-Item $zip, \"$env:TEMP\\<FontName>\" -Recurse -Force
+   }"
+   ```
+3. Print success message.
+4. Warn: "Restart your terminal for the font to take effect."
+5. If Windows Terminal is detected (`/mnt/c/Users/*/AppData/Local/Packages/Microsoft.WindowsTerminal*/`):
+   suggest adding `"fontFace": "<FontName> Nerd Font"` to `settings.json`.
+
+**Error handling:**
+
+- Network failure (GitHub API or download): print error, suggest manual install from `https://www.nerdfonts.com/`.
+- PowerShell not found in WSL: print manual instructions for Windows-side install.
+- Font already installed (`fc-list` match on macOS/Linux, or user confirms): skip with "already installed".
+
+**Integration with `install` and `doctor`:**
+
+- `install` step 10 (after doctor): if Nerd Font check fails, offer `"Install a Nerd Font now? [Y/n]"`.
+  If yes, delegate to `install-font`. If no, print manual install URL.
+- `doctor` check 10 (new): Nerd Font detection via `fc-list` (macOS/Linux) or visual prompt
+  (WSL, since Windows fonts aren't visible from Linux). Pass: `NerdFont: JetBrainsMono Nerd Font`.
+  Fail: `NerdFont not detected — run: npx @henryavila/claudebar install-font`.
 
 ### `npx @henryavila/claudebar uninstall`
 
