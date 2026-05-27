@@ -1,0 +1,65 @@
+# claudebar config v1
+#
+# All options shown with defaults, commented out.
+# Uncomment and change only what you want.
+# Recompiles automatically on next statusline render.
+#
+# Docs: https://github.com/henryavila/claudebar
+
+[layout]
+# force = "auto"
+# refresh_interval = 30
+
+[chips]
+# model = true
+# effort = true
+# tmux = true
+# repo = true
+# branch = true
+# worktree = true
+# dirty = true
+# pr = true
+# agent = true
+# ctx_bar = true
+# five_hour_bar = true
+# seven_day_bar = true
+# countdown = true
+# time_marker = true
+
+[thresholds]
+# warning = 60
+# critical = 90
+
+[colors]
+# model = 213
+# model_dim = 240
+# effort_low = 76
+# effort_med = 39
+# effort_high = 220
+# effort_xhigh = 208
+# effort_max = 197
+# repo = 245
+# worktree = 147
+# branch = 76
+# dirty = 178
+# clean = 82
+# pr_pending = 220
+# pr_approved = 82
+# pr_changes = 196
+# pr_draft = 240
+# bar_green = 76
+# bar_yellow = 220
+# bar_red = 196
+# bar_dim = 238
+# agent = 141
+# tmux = 105
+# separator = 238
+
+[glyphs]
+# sparkle = "✦"
+# pencil = ""
+# git = ""
+# pr = ""
+# tmux = ""
+# gear = ""
+# worktree = "⎇"

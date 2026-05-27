@@ -144,6 +144,7 @@ patch_settings() {
 }
 
 main() {
+    warn "This installer is deprecated. Use: npx @henryavila/claudebar install"
     section "Claude Code statusline installer"
 
     OS=$(detect_os)

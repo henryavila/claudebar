@@ -22,6 +22,7 @@ file_mtime() {
 }
 
 main() {
+    warn "This uninstaller is deprecated. Use: npx @henryavila/claudebar uninstall"
     section "Claude Code statusline uninstaller"
 
     [[ -f "$SETTINGS" ]] || error "Settings file not found at $SETTINGS"

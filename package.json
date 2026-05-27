@@ -1,0 +1,36 @@
+{
+  "name": "@henryavila/claudebar",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Zone-driven statusline for Claude Code with TOML config",
+  "bin": {
+    "claudebar": "./bin/cli.js"
+  },
+  "files": [
+    "bin/",
+    "src/",
+    "assets/",
+    "README.md",
+    "CHANGELOG.md"
+  ],
+  "engines": {
+    "node": ">= 18.0.0"
+  },
+  "scripts": {
+    "test": "node --test test/cli/*.test.js && bash test/run-all.sh",
+    "test:cli": "node --test test/cli/*.test.js",
+    "test:bash": "bash test/run-all.sh"
+  },
+  "keywords": [
+    "claude-code",
+    "statusline",
+    "terminal",
+    "claudebar"
+  ],
+  "author": "Henry Avila",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/henryavila/claudebar"
+  }
+}

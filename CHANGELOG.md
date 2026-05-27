@@ -1,6 +1,39 @@
 # Changelog
 
-## v1.1.0 — Unreleased
+## v1.0.0 — 2026-05-27
+
+### npm distribution
+
+claudebar is now distributed as `@henryavila/claudebar` on npm. Install, update, configure, and diagnose via `npx`:
+
+```bash
+npx @henryavila/claudebar install
+npx @henryavila/claudebar config
+npx @henryavila/claudebar doctor
+npx @henryavila/claudebar update
+npx @henryavila/claudebar uninstall
+npx @henryavila/claudebar install-font
+```
+
+No git clone required. Zero npm dependencies — CLI uses Node.js 18+ stdlib only.
+
+### TOML configuration system
+
+Every color, threshold, glyph, and chip toggle is now configurable via `~/.config/claudebar/config.toml`. The config file is self-documenting (all options listed with defaults, commented out). Changes auto-recompile on the next statusline render (<1ms overhead).
+
+### Chip toggles
+
+Individual statusline segments can be toggled on/off via `[chips]` in config.toml: model, effort, tmux, repo, branch, worktree, dirty, PR, agent, ctx bar, 5h bar, 7d bar, countdown text, and time-elapsed marker.
+
+### Configurable thresholds
+
+Zone boundaries (green→yellow→red) are now configurable via `[thresholds]` in config.toml. Defaults remain 60/90.
+
+### CI/CD
+
+GitHub Actions workflows for testing (ubuntu + macOS matrix) and npm publishing via OIDC Trusted Publishing.
+
+## Previous (unreleased)
 
 ### Features
 
