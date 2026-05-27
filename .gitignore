@@ -1,3 +1,10 @@
 # Test artifacts
 test/tmp/
 *.log
+
+# atomic-skills
+.atomic-skills/status/stop.log
+.atomic-skills/status/SKIP
+.atomic-skills/initiatives/*.rendered.md
+.atomic-skills/bootstrap-drafts/
+.atomic-skills/status/bootstrap.json
