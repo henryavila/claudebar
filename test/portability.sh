@@ -21,12 +21,11 @@ else
     echo "  ok: no realpath / readlink -f"
 fi
 
-# 3. Bash 4+ features only (no associative array shorthand, no bash 5+ stuff)
-# Spot check: associative arrays via 'declare -A' are bash 4+ OK
-if grep -nE '\${[a-zA-Z_]+@U}|\${[a-zA-Z_]+@u}' "$script" >/dev/null; then
-    echo "FAIL: bash 5+ parameter expansion (@U, @u) used"; fail=1
+# 3. No bash 4+ features (project targets bash 3.2 — macOS default)
+if grep -nE 'declare -A|declare -n|local -n|mapfile|readarray|\$\{[a-zA-Z_]+@[Uu]\}|\$\{[a-zA-Z_]+,,\}|\$\{[a-zA-Z_]+\^\^\}' "$script" >/dev/null; then
+    echo "FAIL: bash 4+ or 5+ syntax found"; fail=1
 else
-    echo "  ok: no bash 5+ syntax"
+    echo "  ok: no bash 4+/5+ syntax"
 fi
 
 # 4. Script runs with bash 4.0 syntax (basic smoke)
