@@ -15,8 +15,13 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           registry-url: https://registry.npmjs.org
+      # OIDC trusted publishing authenticates the publish itself (not just
+      # provenance) and requires npm >= 11.5.1. Node 22 ships npm 10.x, which
+      # signs provenance but cannot use OIDC to authenticate the PUT — that is
+      # the E404 "Not Found" on publish. Upgrade npm before publishing.
+      - run: npm install -g npm@latest
       - run: npm ci
       - run: npm test
       - run: npm publish --provenance --access public
