@@ -1,5 +1,5 @@
 ---
-last_updated: 2026-05-27T00:59:42Z
+last_updated: 2026-05-29T13:23:38Z
 active_count: 1
 archived_count: 3
 ---
@@ -24,4 +24,7 @@ Canonical entry point. Auto-updated by `atomic-skills:project-status`. Read firs
 
 ## Ad-Hoc Sessions Log (last 5)
 
-_(empty)_
+| When | Description |
+|---|---|
+| 2026-05-29T13:12:14Z | Fix: statusline shows directory basename (folder glyph) when not in a git repo — added CWD extraction + path fallback in `identity_row`/`compact_row2`, updated no-repo fixtures (11, 24) |
+| 2026-05-29T13:23:38Z | Improve worktree indicator: ⎇ marker now replaces the git glyph and recolors the whole branch violet (kills U+2387 overlap), added to compact layout too via shared `branch_chip` helper; regenerated worktree fixtures (02-06, 21) + DESIGN.md |

@@ -71,11 +71,13 @@ readonly THRESHOLD_CRITICAL=${THRESHOLD_CRITICAL:-90}
 #   GLYPH_PR      U+F407  nf-fa-code-pull-req    — PR chip
 #   GLYPH_TMUX    U+F1B2  nf-fa-cube             — tmux session chip
 #   GLYPH_GEAR    U+F085  nf-fa-cogs             — agent-active chip
+#   GLYPH_FOLDER  U+F07B  nf-fa-folder           — non-git path fallback
 readonly GLYPH_PENCIL=${GLYPH_PENCIL:-$'\xef\x81\x80'}
 readonly GLYPH_GIT=${GLYPH_GIT:-$'\xee\x9c\xa5'}
 readonly GLYPH_PR=${GLYPH_PR:-$'\xef\x90\x87'}
 readonly GLYPH_TMUX=${GLYPH_TMUX:-$'\xef\x86\xb2'}
 readonly GLYPH_GEAR=${GLYPH_GEAR:-$'\xef\x82\x85'}
+readonly GLYPH_FOLDER=${GLYPH_FOLDER:-$'\xef\x81\xbb'}
 
 # ─── Chip toggle defaults ────────────────────────────────────────────
 readonly CHIP_MODEL=${CHIP_MODEL:-1}
@@ -288,19 +290,31 @@ compact_row1() {
 }
 
 # ─── compact_row2 — git context (repo name + branch + dirty) ─────────
-# Usage: compact_row2 repo=X branch=X dirty_count=X
+# Usage: compact_row2 repo=X branch=X dirty_count=X worktree=X cwd=X
+# Outside a git repo (no repo) the directory basename is shown instead,
+# so the location is never blank. The worktree marker (via branch_chip) is
+# rendered here too, matching the full layout.
 compact_row2() {
-    local repo="" branch="" dirty_count=""
+    local repo="" branch="" dirty_count="" worktree="" cwd=""
     local arg
     for arg in "$@"; do
         case "$arg" in
             repo=*)         repo=${arg#repo=} ;;
             branch=*)       branch=${arg#branch=} ;;
             dirty_count=*)  dirty_count=${arg#dirty_count=} ;;
+            worktree=*)     worktree=${arg#worktree=} ;;
+            cwd=*)          cwd=${arg#cwd=} ;;
         esac
     done
 
-    [[ -z "$repo" ]] && return
+    # No git repo → fall back to the current directory basename.
+    if [[ -z "$repo" ]]; then
+        if [[ -n "$cwd" ]] && (( CHIP_REPO )); then
+            fg "$C_REPO" "${GLYPH_FOLDER} ${cwd##*/}"
+            printf '\n'
+        fi
+        return
+    fi
 
     if (( CHIP_REPO )); then
         fg "$C_REPO" "$repo"
@@ -308,9 +322,7 @@ compact_row2() {
         sep "›"
         printf ' '
     fi
-    if [[ -n "$branch" ]] && (( CHIP_BRANCH )); then
-        fg "$C_BRANCH" "${GLYPH_GIT} ${branch}"
-    fi
+    branch_chip "$worktree" "$branch"
     if [[ -n "$dirty_count" ]] && (( CHIP_DIRTY )); then
         printf ' '
         dirty_indicator "$dirty_count"
@@ -451,6 +463,30 @@ dirty_indicator() {
     fi
 }
 
+# ─── branch_chip WORKTREE BRANCH — worktree-aware branch render ────────
+# Shared by full + compact layouts. In a worktree, the ⎇ marker REPLACES
+# the git branch glyph and the whole chip renders in worktree violet
+# (C_WORKTREE) — so a worktree is unmistakable at a glance, and there is no
+# longer a "⎇ <git-glyph>" adjacency for terminals to overlap (the old bug:
+# U+2387 is ambiguous-width and bled into the following Private-Use glyph).
+# Outside a worktree: git glyph + branch in green (C_BRANCH).
+# Honors CHIP_WORKTREE (suppress worktree styling) and CHIP_BRANCH.
+# wt_glyph is U+2387 ⎇ alternative-key — kept as UTF-8 bytes for transport
+# safety, same rationale as the Private-Use glyphs declared at the top.
+branch_chip() {
+    local worktree=$1 branch=$2
+    local wt_glyph=$'\xe2\x8e\x87'
+    if [[ -n "$worktree" ]] && (( CHIP_WORKTREE )); then
+        if [[ -n "$branch" ]]; then
+            fg "$C_WORKTREE" "${wt_glyph} ${branch}"
+        else
+            fg "$C_WORKTREE" "${wt_glyph}"
+        fi
+    elif [[ -n "$branch" ]] && (( CHIP_BRANCH )); then
+        fg "$C_BRANCH" "${GLYPH_GIT} ${branch}"
+    fi
+}
+
 # ─── identity_row — compose row 1 ─────────────────────────────────────
 # Usage: identity_row key=value key=value ...
 # Keys: model effort owner repo worktree branch dirty_count
@@ -458,7 +494,7 @@ dirty_indicator() {
 identity_row() {
     local model="" effort="" owner="" repo=""
     local worktree="" branch="" dirty_count=""
-    local pr_number="" pr_state="" agent=""
+    local pr_number="" pr_state="" agent="" cwd=""
 
     local arg
     for arg in "$@"; do
@@ -473,11 +509,11 @@ identity_row() {
             pr_number=*)    pr_number=${arg#pr_number=} ;;
             pr_state=*)     pr_state=${arg#pr_state=} ;;
             agent=*)        agent=${arg#agent=} ;;
+            cwd=*)          cwd=${arg#cwd=} ;;
         esac
     done
 
     local sparkle="✦"
-    local wt_glyph=$'\xe2\x8e\x87'   # U+2387 ⎇ alternative-key — NOT private use, but kept as bytes for consistency
 
     # ── Left group: model + (effort | agent) ─────────────
     if [[ -n "$agent" ]] && (( CHIP_AGENT )); then
@@ -522,16 +558,15 @@ identity_row() {
         printf ' '
         sep "›"
         printf ' '
-        if [[ -n "$worktree" ]] && (( CHIP_WORKTREE )); then
-            fg "$C_WORKTREE" "${wt_glyph} "
-        fi
-        if [[ -n "$branch" ]] && (( CHIP_BRANCH )); then
-            fg "$C_BRANCH" "${GLYPH_GIT} ${branch}"
-        fi
+        branch_chip "$worktree" "$branch"
         if [[ -n "$dirty_count" ]] && (( CHIP_DIRTY )); then
             printf ' '
             dirty_indicator "$dirty_count"
         fi
+    elif [[ -n "$cwd" ]] && (( CHIP_REPO )); then
+        # No git repo → show the directory basename so location is never blank.
+        printf '  '
+        fg "$C_REPO" "${GLYPH_FOLDER} ${cwd##*/}"
     fi
 
     # ── Right group: PR chip ─────────────────────────────
@@ -658,6 +693,7 @@ main() {
         "EFFORT="     + ((.effort.level // "") | @sh) + "\n" +
         "OWNER="      + ((.workspace.repo.owner // "") | @sh) + "\n" +
         "REPO="       + ((.workspace.repo.name // "") | @sh) + "\n" +
+        "CWD="        + ((.workspace.current_dir // .cwd // "") | @sh) + "\n" +
         "WORKTREE="   + ((.workspace.git_worktree // "") | @sh) + "\n" +
         "CTX="        + ((.context_window.used_percentage // 0 | floor) | tostring | @sh) + "\n" +
         "FIVE_HOUR="            + ((.rate_limits.five_hour.used_percentage // "") | tostring | @sh) + "\n" +
@@ -704,7 +740,9 @@ main() {
         compact_row2 \
             repo="$REPO" \
             branch="$BRANCH" \
-            dirty_count="$DIRTY"
+            dirty_count="$DIRTY" \
+            worktree="$WORKTREE" \
+            cwd="$CWD"
 
         compact_row3 \
             ctx="$CTX" \
@@ -719,7 +757,8 @@ main() {
             branch="$BRANCH" \
             dirty_count="$DIRTY" \
             pr_number="$PR_NUMBER" pr_state="$PR_STATE" \
-            agent="$AGENT"
+            agent="$AGENT" \
+            cwd="$CWD"
 
         fuel_row \
             ctx="$CTX" \
