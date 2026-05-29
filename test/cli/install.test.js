@@ -5,6 +5,10 @@ import path from 'node:path';
 import os from 'node:os';
 import { install } from '../../src/install.js';
 
+const PKG_VERSION = JSON.parse(
+  fs.readFileSync(new URL('../../package.json', import.meta.url), 'utf8')
+).version;
+
 function makeTmpDir() {
   return fs.mkdtempSync(path.join(os.tmpdir(), 'claudebar-install-test-'));
 }
@@ -55,7 +59,7 @@ describe('install', () => {
     await install({ configDir, settingsPath, log: () => {} });
     assert.ok(fs.existsSync(path.join(configDir, '.version')));
     const version = fs.readFileSync(path.join(configDir, '.version'), 'utf8');
-    assert.equal(version, '1.0.0');
+    assert.equal(version, PKG_VERSION);
   });
 
   it('backs up and patches settings.json', async () => {
@@ -71,5 +75,34 @@ describe('install', () => {
   it('compiles config.sh', async () => {
     await install({ configDir, settingsPath, log: () => {} });
     assert.ok(fs.existsSync(path.join(configDir, 'config.sh')));
+  });
+
+  it('copies the self-heal payload (ensure-statusline.mjs + settings.js)', async () => {
+    await install({ configDir, settingsPath, log: () => {} });
+    assert.ok(fs.existsSync(path.join(configDir, 'ensure-statusline.mjs')));
+    assert.ok(fs.existsSync(path.join(configDir, 'settings.js')));
+  });
+
+  it('registers the self-heal SessionStart hook', async () => {
+    await install({ configDir, settingsPath, log: () => {} });
+    const settings = JSON.parse(fs.readFileSync(settingsPath, 'utf8'));
+    const cmds = (settings.hooks?.SessionStart ?? []).flatMap((e) => e.hooks.map((h) => h.command));
+    assert.ok(cmds.some((c) => c.includes('ensure-statusline')));
+  });
+
+  it('preserves pre-existing SessionStart hooks', async () => {
+    fs.writeFileSync(
+      settingsPath,
+      JSON.stringify(
+        { hooks: { SessionStart: [{ matcher: '*', hooks: [{ type: 'command', command: '/x/version-check.sh' }] }] } },
+        null,
+        2
+      )
+    );
+    await install({ configDir, settingsPath, log: () => {} });
+    const settings = JSON.parse(fs.readFileSync(settingsPath, 'utf8'));
+    const cmds = settings.hooks.SessionStart.flatMap((e) => e.hooks.map((h) => h.command));
+    assert.ok(cmds.some((c) => c.includes('version-check.sh')), 'existing hook kept');
+    assert.ok(cmds.some((c) => c.includes('ensure-statusline')), 'heal hook added');
   });
 });

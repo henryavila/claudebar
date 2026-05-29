@@ -1,5 +1,13 @@
 # Changelog
 
+## v1.1.0 — 2026-05-29
+
+### Self-healing statusLine config
+
+`install` and `update` now register a `SessionStart` hook (`ensure-statusline.mjs`) that restores the `statusLine` entry in `~/.claude/settings.json` if it ever goes missing — e.g. after a Claude Code update or a settings rewrite that drops it. The hook is silent, best-effort (never blocks a session, never writes to stdout), and only restores when `statusLine` is absent, so a user-customized statusLine is never clobbered. Existing `SessionStart` hooks (e.g. atomic-skills version-check) are preserved.
+
+`update` runs this self-heal on every invocation — including when already on the latest version — because the common trigger (config dropped externally) is independent of the claudebar version. `uninstall` removes the hook; `doctor` reports whether it is registered.
+
 ## v1.0.0 — 2026-05-27
 
 ### npm distribution
