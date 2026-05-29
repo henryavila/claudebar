@@ -16,11 +16,11 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-          registry-url: https://registry.npmjs.org
-      # OIDC trusted publishing authenticates the publish itself (not just
-      # provenance) and requires npm >= 11.5.1. Node 22 ships npm 10.x, which
-      # signs provenance but cannot use OIDC to authenticate the PUT — that is
-      # the E404 "Not Found" on publish. Upgrade npm before publishing.
+      # Do NOT set registry-url here: it writes an .npmrc with
+      # `_authToken=${NODE_AUTH_TOKEN}` + `always-auth=true`, which makes npm
+      # attempt (empty) token auth and never perform the OIDC exchange — the
+      # cause of the E404 "you do not have permission" on publish. With no token
+      # in .npmrc, npm >= 11.5.1 + id-token:write uses trusted publishing.
       - run: npm install -g npm@latest
       - run: npm ci
       - run: npm test
