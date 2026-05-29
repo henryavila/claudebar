@@ -53,6 +53,7 @@ A small `test/portability.sh` will run the script with synthetic JSON inputs on 
 
 ```
 ✦ {model_short} · {EFFORT}   {owner}/{repo} › [⎇ ]{branch}  {dirty_or_clean}   {pr_chip}
+                              (in a worktree the git icon becomes ⎇ and {branch} renders violet)
 ```
 
 Segments left → right:
@@ -62,8 +63,8 @@ Segments left → right:
 | Model | `model.display_name` | `✦` prefix | pink/magenta (256: 213) |
 | Effort chip | `effort.level` | `LOW` / `MED` / `HIGH` / `XHIGH` / `MAX` text | per-level (see palette) |
 | Repo | `workspace.repo.owner/name` | none | dim grey (245) |
-| Worktree marker | `workspace.git_worktree` present | `⎇ ` (only when in a worktree) | soft violet (147) |
-| Branch | git current branch | nf-fa git icon ` ` | leaf green (76) |
+| Branch (normal) | git current branch | nf-fa git icon ` ` | leaf green (76) |
+| Branch (in worktree) | `workspace.git_worktree` present | `⎇ ` marker **replaces** the git icon; whole chip recolored | soft violet (147) |
 | Dirty/clean | `git status --porcelain \| wc -l` | `✎N` if N>0, else `✓` | amber (178) / green (82) |
 | PR chip | `pr.number` + `pr.review_state` | nf git pull icon ` ` + state glyph | per-state (see palette) |
 

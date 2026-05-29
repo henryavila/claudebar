@@ -1,5 +1,15 @@
 # Changelog
 
+## v1.1.1 — 2026-05-29
+
+### Fix: location always visible outside git repos
+
+The identity row showed nothing in the location slot when the current directory was not a git repository. It now falls back to the directory basename with a folder glyph (` name`), in both the full and compact layouts, so the working location is never blank.
+
+### Fix: worktree indicator is unmistakable and no longer overlaps
+
+The git worktree marker (`⎇`, U+2387) was rendered as a separate glyph immediately before the branch icon. Its ambiguous character width caused it to visually overlap the following Private-Use git glyph, and the small unlabeled symbol was easy to miss. Now, when inside a worktree, the `⎇` marker **replaces** the git branch glyph and the whole branch chip renders in worktree violet — removing the glyph adjacency that caused the overlap and making a worktree obvious at a glance. The marker is now also shown in the compact layout (previously full-layout only), via a shared `branch_chip` renderer.
+
 ## v1.1.0 — 2026-05-29
 
 ### Self-healing statusLine config
