@@ -4,6 +4,7 @@ import os from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { parseTOML } from './toml-parser.js';
 import { compileConfig } from './config-compiler.js';
+import { setStatusLine, ensureHealHook } from './settings.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ASSETS_DIR = path.join(__dirname, '..', 'assets');
@@ -37,6 +38,12 @@ export async function install({ configDir, settingsPath, log } = {}) {
   fs.copyFileSync(parserSrc, parserDst);
   log(`Copied toml-parser.sh`);
 
+  // Self-heal payload: the hook script + its shared settings logic. Copying
+  // settings.js next to the .mjs lets the hook import it from the install dir.
+  fs.copyFileSync(path.join(ASSETS_DIR, 'ensure-statusline.mjs'), path.join(configDir, 'ensure-statusline.mjs'));
+  fs.copyFileSync(path.join(__dirname, 'settings.js'), path.join(configDir, 'settings.js'));
+  log(`Copied self-heal hook (ensure-statusline.mjs + settings.js)`);
+
   const configToml = path.join(configDir, 'config.toml');
   if (!fs.existsSync(configToml)) {
     const defaultConfig = path.join(ASSETS_DIR, 'default-config.toml');
@@ -63,14 +70,11 @@ export async function install({ configDir, settingsPath, log } = {}) {
     log(`Backed up settings.json to ${path.basename(backup)}`);
 
     const settings = JSON.parse(fs.readFileSync(settingsPath, 'utf8'));
-    settings.statusLine = {
-      type: 'command',
-      command: `~/.config/claudebar/statusline.sh`,
-      padding: 0,
-      refreshInterval: 30,
-    };
+    setStatusLine(settings);
+    const { changed: hookAdded } = ensureHealHook(settings);
     fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2) + '\n');
     log(`Patched settings.json with statusLine`);
+    if (hookAdded) log(`Registered self-heal SessionStart hook`);
   } else {
     log(`settings.json not found at ${settingsPath} — skipped patching`);
   }

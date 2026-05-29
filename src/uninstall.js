@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 import readline from 'node:readline';
+import { removeHealHook } from './settings.js';
 
 function timestamp() {
   const d = new Date();
@@ -38,8 +39,10 @@ export async function uninstall({ configDir, settingsPath, confirm, log } = {}) 
 
     const settings = JSON.parse(fs.readFileSync(settingsPath, 'utf8'));
     delete settings.statusLine;
+    const { changed: hookRemoved } = removeHealHook(settings);
     fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2) + '\n');
     log(`Removed statusLine from settings.json`);
+    if (hookRemoved) log(`Removed self-heal SessionStart hook`);
   } else {
     log(`settings.json not found at ${settingsPath} — skipped`);
   }

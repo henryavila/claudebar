@@ -78,6 +78,22 @@ export async function doctor({ configDir, settingsPath, log } = {}) {
     return `statusLine → ${cmd}`;
   }));
 
+  results.push(check('self-heal hook', () => {
+    if (!fs.existsSync(settingsPath)) throw new Error(`settings.json not found`);
+    const settings = JSON.parse(fs.readFileSync(settingsPath, 'utf8'));
+    const sessionStart = settings?.hooks?.SessionStart ?? [];
+    const present = sessionStart.some((entry) =>
+      (entry?.hooks ?? []).some(
+        (h) => typeof h?.command === 'string' && h.command.includes('ensure-statusline')
+      )
+    );
+    if (!present) throw new Error(`not registered — run: npx @henryavila/claudebar update`);
+    if (!fs.existsSync(path.join(configDir, 'ensure-statusline.mjs'))) {
+      throw new Error(`hook registered but ensure-statusline.mjs missing — run: npx @henryavila/claudebar update`);
+    }
+    return `SessionStart → ensure-statusline.mjs`;
+  }));
+
   results.push(check('version', () => {
     const versionFile = path.join(configDir, '.version');
     if (!fs.existsSync(versionFile)) throw new Error(`not installed`);
