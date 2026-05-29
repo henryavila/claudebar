@@ -4,6 +4,7 @@ on:
   release:
     types: [published]
 
+# OIDC Trusted Publishing — no npm token needed
 permissions:
   contents: read
   id-token: write
@@ -13,15 +14,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
-      # Do NOT set registry-url here: it writes an .npmrc with
-      # `_authToken=${NODE_AUTH_TOKEN}` + `always-auth=true`, which makes npm
-      # attempt (empty) token auth and never perform the OIDC exchange — the
-      # cause of the E404 "you do not have permission" on publish. With no token
-      # in .npmrc, npm >= 11.5.1 + id-token:write uses trusted publishing.
+          node-version: 20
+          registry-url: https://registry.npmjs.org
+
       - run: npm install -g npm@latest
       - run: npm ci
       - run: npm test
+
       - run: npm publish --provenance --access public
