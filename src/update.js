@@ -45,7 +45,7 @@ export async function update({ configDir, settingsPath, log } = {}) {
     if (slRestored || hookAdded) {
       writeSettingsAtomic(settingsPath, settings);
       if (slRestored) log(`Restored statusLine in settings.json`);
-      if (hookAdded) log(`Registered self-heal SessionStart hook`);
+      if (hookAdded) log(`Registered self-heal hooks (SessionStart + UserPromptSubmit)`);
     }
   }
 

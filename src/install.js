@@ -74,7 +74,7 @@ export async function install({ configDir, settingsPath, log } = {}) {
     const { changed: hookAdded } = ensureHealHook(settings);
     fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2) + '\n');
     log(`Patched settings.json with statusLine`);
-    if (hookAdded) log(`Registered self-heal SessionStart hook`);
+    if (hookAdded) log(`Registered self-heal hooks (SessionStart + UserPromptSubmit)`);
   } else {
     log(`settings.json not found at ${settingsPath} — skipped patching`);
   }

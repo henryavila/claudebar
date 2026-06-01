@@ -11,8 +11,16 @@ export const STATUSLINE_COMMAND = '~/.config/claudebar/statusline.sh';
 export const HEAL_HOOK_COMMAND = 'node ~/.config/claudebar/ensure-statusline.mjs';
 
 // A stable marker substring used to find OUR hook among any others the user
-// (or another tool) has registered under SessionStart.
+// (or another tool) has registered under a hook event.
 const HEAL_HOOK_MARKER = 'ensure-statusline';
+
+// Events the heal hook registers under. SessionStart recovers a dropped
+// statusLine at the next session start; UserPromptSubmit (fires once per turn)
+// recovers it MID-session — Claude Code re-persists settings.json from its
+// in-memory copy on a TUI toggle, dropping statusLine, and (validated live) it
+// re-reads the statusLine block from disk, so rewriting it on the next turn
+// redraws the bar without a restart.
+const HEAL_HOOK_EVENTS = ['SessionStart', 'UserPromptSubmit'];
 
 export function statusLineBlock() {
   return {
@@ -71,44 +79,55 @@ export function setStatusLine(settings) {
   return { changed: true };
 }
 
-// Register the self-healing SessionStart hook, preserving any hooks the user
-// already has (e.g. atomic-skills version-check). Idempotent — keyed off the
-// HEAL_HOOK_MARKER substring. Mutates `settings` in place.
+// Register the self-healing hook under every HEAL_HOOK_EVENTS event, preserving
+// any hooks the user already has (e.g. atomic-skills version-check). Idempotent
+// per event — keyed off the HEAL_HOOK_MARKER substring — so an older install that
+// only registered SessionStart gets UserPromptSubmit back-filled on the next run.
+// Mutates `settings` in place. Returns changed:true if ANY event was modified.
 export function ensureHealHook(settings) {
   settings.hooks ??= {};
-  settings.hooks.SessionStart ??= [];
-  const already = settings.hooks.SessionStart.some((entry) =>
-    (entry?.hooks ?? []).some(
-      (h) => typeof h?.command === 'string' && h.command.includes(HEAL_HOOK_MARKER)
-    )
-  );
-  if (already) return { changed: false };
-  settings.hooks.SessionStart.push({
-    matcher: '*',
-    hooks: [{ type: 'command', command: HEAL_HOOK_COMMAND }],
-  });
-  return { changed: true };
-}
-
-// Remove the self-healing hook (used by `uninstall`). Drops our hook entries
-// and prunes any matcher objects left empty, without touching other hooks.
-export function removeHealHook(settings) {
-  const list = settings?.hooks?.SessionStart;
-  if (!Array.isArray(list)) return { changed: false };
   let changed = false;
-  const pruned = [];
-  for (const entry of list) {
-    const hooks = entry?.hooks ?? [];
-    const kept = hooks.filter(
-      (h) => !(typeof h?.command === 'string' && h.command.includes(HEAL_HOOK_MARKER))
+  for (const event of HEAL_HOOK_EVENTS) {
+    settings.hooks[event] ??= [];
+    const already = settings.hooks[event].some((entry) =>
+      (entry?.hooks ?? []).some(
+        (h) => typeof h?.command === 'string' && h.command.includes(HEAL_HOOK_MARKER)
+      )
     );
-    if (kept.length !== hooks.length) changed = true;
-    if (kept.length > 0) pruned.push({ ...entry, hooks: kept });
-    else if (!Array.isArray(entry?.hooks)) pruned.push(entry); // entry had no hooks array — leave as-is
-  }
-  if (changed) {
-    if (pruned.length > 0) settings.hooks.SessionStart = pruned;
-    else delete settings.hooks.SessionStart;
+    if (already) continue;
+    settings.hooks[event].push({
+      matcher: '*',
+      hooks: [{ type: 'command', command: HEAL_HOOK_COMMAND }],
+    });
+    changed = true;
   }
   return { changed };
+}
+
+// Remove the self-healing hook (used by `uninstall`) from every event it may be
+// registered under. Drops our hook entries and prunes any matcher objects left
+// empty, without touching other hooks. Returns changed:true if ANY event changed.
+export function removeHealHook(settings) {
+  let changedAny = false;
+  for (const event of HEAL_HOOK_EVENTS) {
+    const list = settings?.hooks?.[event];
+    if (!Array.isArray(list)) continue;
+    let changed = false;
+    const pruned = [];
+    for (const entry of list) {
+      const hooks = entry?.hooks ?? [];
+      const kept = hooks.filter(
+        (h) => !(typeof h?.command === 'string' && h.command.includes(HEAL_HOOK_MARKER))
+      );
+      if (kept.length !== hooks.length) changed = true;
+      if (kept.length > 0) pruned.push({ ...entry, hooks: kept });
+      else if (!Array.isArray(entry?.hooks)) pruned.push(entry); // entry had no hooks array — leave as-is
+    }
+    if (changed) {
+      if (pruned.length > 0) settings.hooks[event] = pruned;
+      else delete settings.hooks[event];
+      changedAny = true;
+    }
+  }
+  return { changed: changedAny };
 }
