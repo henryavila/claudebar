@@ -1,6 +1,6 @@
 ---
-last_updated: 2026-05-29T13:23:38Z
-active_count: 1
+last_updated: 2026-06-01T09:24:05Z
+active_count: 3
 archived_count: 3
 ---
 
@@ -13,6 +13,8 @@ Canonical entry point. Auto-updated by `atomic-skills:project-status`. Read firs
 | Slug | Status | Started | Branch | Next Action |
 |---|---|---|---|---|
 | npm-distribution | active | 2026-05-26 | — | Create package.json and bin/cli.js scaffold per spec architecture |
+| midsession-selfheal | active | 2026-06-01 | — | TDD: register heal on UserPromptSubmit for mid-session statusLine recovery |
+| auto-update | active | 2026-06-01 | — | Fase 1 red-first: testes de decideUpdate() (semver) — ver handoff na initiative |
 
 ## Recently Archived (last 10)
 
@@ -28,3 +30,4 @@ Canonical entry point. Auto-updated by `atomic-skills:project-status`. Read firs
 |---|---|
 | 2026-05-29T13:12:14Z | Fix: statusline shows directory basename (folder glyph) when not in a git repo — added CWD extraction + path fallback in `identity_row`/`compact_row2`, updated no-repo fixtures (11, 24) |
 | 2026-05-29T13:23:38Z | Improve worktree indicator: ⎇ marker now replaces the git glyph and recolors the whole branch violet (kills U+2387 overlap), added to compact layout too via shared `branch_chip` helper; regenerated worktree fixtures (02-06, 21) + DESIGN.md |
+| 2026-06-01T09:24:05Z | Fix(TDD): statusbar disappears after a while. Root cause — `assets/ensure-statusline.mjs` restored `statusLine` but never re-registered its own SessionStart hook (called `ensureStatusLine`, not `ensureHealHook`), so once an external settings rewrite dropped the heal hook entry auto-healing died permanently. Fix: heal now also calls `ensureHealHook` and writes when either changed. +5 tests in `test/cli/heal.test.js`; full suite 73 CLI + 38 bash green; ran `update` on live machine (restored statusLine + hook, bar renders) |
