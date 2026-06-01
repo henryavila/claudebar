@@ -49,6 +49,13 @@ describe('parseTOML', () => {
     assert.equal(config.glyphs.sparkle, '✦');
     assert.equal(config.glyphs.pencil, 'X');
   });
+
+  it('parses the [update] section (string mode + numeric interval)', () => {
+    const config = parseTOML('[update]\nauto_update = "patch"\nauto_update_interval_hours = 24');
+    assert.equal(config.update.auto_update, 'patch');
+    assert.equal(config.update.auto_update_interval_hours, 24);
+    assert.equal(typeof config.update.auto_update_interval_hours, 'number');
+  });
 });
 
 describe('validateConfig', () => {
@@ -81,5 +88,24 @@ describe('validateConfig', () => {
   it('rejects invalid layout force', () => {
     const result = validateConfig({ layout: { force: 'tiny' } });
     assert.equal(result.valid, false);
+  });
+
+  it('passes a valid [update] section', () => {
+    for (const mode of ['patch', 'all', 'off']) {
+      const result = validateConfig({ update: { auto_update: mode, auto_update_interval_hours: 24 } });
+      assert.equal(result.valid, true, `${mode} should be valid`);
+    }
+  });
+
+  it('rejects an invalid auto_update mode', () => {
+    const result = validateConfig({ update: { auto_update: 'sometimes' } });
+    assert.equal(result.valid, false);
+    assert.ok(result.errors.some((e) => e.message.includes('auto_update')));
+  });
+
+  it('rejects a non-positive-integer interval', () => {
+    assert.equal(validateConfig({ update: { auto_update_interval_hours: 0 } }).valid, false);
+    assert.equal(validateConfig({ update: { auto_update_interval_hours: -1 } }).valid, false);
+    assert.equal(validateConfig({ update: { auto_update_interval_hours: 1.5 } }).valid, false);
   });
 });

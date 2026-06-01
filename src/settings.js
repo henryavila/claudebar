@@ -9,10 +9,17 @@ import fs from 'node:fs';
 // update, and the heal hook all agree on what "configured" means.
 export const STATUSLINE_COMMAND = '~/.config/claudebar/statusline.sh';
 export const HEAL_HOOK_COMMAND = 'node ~/.config/claudebar/ensure-statusline.mjs';
+export const AUTO_UPDATE_HOOK_COMMAND = 'node ~/.config/claudebar/auto-update.mjs';
 
 // A stable marker substring used to find OUR hook among any others the user
 // (or another tool) has registered under a hook event.
 const HEAL_HOOK_MARKER = 'ensure-statusline';
+const AUTO_UPDATE_HOOK_MARKER = 'auto-update';
+
+// Auto-update is checked at SessionStart ONLY — never on UserPromptSubmit nor in
+// the render path. The hook itself just spawns a detached, timestamp-throttled
+// updater and exits, so the budget here is a single stat() on most sessions.
+const AUTO_UPDATE_HOOK_EVENTS = ['SessionStart'];
 
 // Events the heal hook registers under. SessionStart recovers a dropped
 // statusLine at the next session start; UserPromptSubmit (fires once per turn)
@@ -102,6 +109,56 @@ export function ensureHealHook(settings) {
     changed = true;
   }
   return { changed };
+}
+
+// Register the auto-update hook under SessionStart, preserving any other hooks
+// (including the heal hook, which shares this event). Idempotent — keyed off the
+// AUTO_UPDATE_HOOK_MARKER substring. Mutates `settings` in place.
+export function ensureAutoUpdateHook(settings) {
+  settings.hooks ??= {};
+  let changed = false;
+  for (const event of AUTO_UPDATE_HOOK_EVENTS) {
+    settings.hooks[event] ??= [];
+    const already = settings.hooks[event].some((entry) =>
+      (entry?.hooks ?? []).some(
+        (h) => typeof h?.command === 'string' && h.command.includes(AUTO_UPDATE_HOOK_MARKER)
+      )
+    );
+    if (already) continue;
+    settings.hooks[event].push({
+      matcher: '*',
+      hooks: [{ type: 'command', command: AUTO_UPDATE_HOOK_COMMAND }],
+    });
+    changed = true;
+  }
+  return { changed };
+}
+
+// Remove the auto-update hook (used by `uninstall`). Drops our entries and prunes
+// matcher objects left empty, leaving the heal hook and any foreign hooks intact.
+export function removeAutoUpdateHook(settings) {
+  let changedAny = false;
+  for (const event of AUTO_UPDATE_HOOK_EVENTS) {
+    const list = settings?.hooks?.[event];
+    if (!Array.isArray(list)) continue;
+    let changed = false;
+    const pruned = [];
+    for (const entry of list) {
+      const hooks = entry?.hooks ?? [];
+      const kept = hooks.filter(
+        (h) => !(typeof h?.command === 'string' && h.command.includes(AUTO_UPDATE_HOOK_MARKER))
+      );
+      if (kept.length !== hooks.length) changed = true;
+      if (kept.length > 0) pruned.push({ ...entry, hooks: kept });
+      else if (!Array.isArray(entry?.hooks)) pruned.push(entry);
+    }
+    if (changed) {
+      if (pruned.length > 0) settings.hooks[event] = pruned;
+      else delete settings.hooks[event];
+      changedAny = true;
+    }
+  }
+  return { changed: changedAny };
 }
 
 // Remove the self-healing hook (used by `uninstall`) from every event it may be

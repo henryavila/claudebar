@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 import { parseTOML } from './toml-parser.js';
 import { compileConfig } from './config-compiler.js';
 import { migrateConfig, parseSchemaVersion, CURRENT_SCHEMA_VERSION } from './config-migrator.js';
-import { readSettings, writeSettingsAtomic, ensureStatusLine, ensureHealHook } from './settings.js';
+import { readSettings, writeSettingsAtomic, ensureStatusLine, ensureHealHook, ensureAutoUpdateHook } from './settings.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ASSETS_DIR = path.join(__dirname, '..', 'assets');
@@ -38,14 +38,22 @@ export async function update({ configDir, settingsPath, log } = {}) {
   // run before the up-to-date early return.
   fs.copyFileSync(path.join(ASSETS_DIR, 'ensure-statusline.mjs'), path.join(configDir, 'ensure-statusline.mjs'));
   fs.copyFileSync(path.join(__dirname, 'settings.js'), path.join(configDir, 'settings.js'));
+  // Auto-update payload back-fills on every update so installs predating the
+  // feature gain it without a fresh install (the exact stuck-on-old-version case
+  // it exists to fix). Like the heal payload, this runs before the version gate.
+  fs.copyFileSync(path.join(ASSETS_DIR, 'auto-update.mjs'), path.join(configDir, 'auto-update.mjs'));
+  fs.copyFileSync(path.join(__dirname, 'auto-update.js'), path.join(configDir, 'auto-update.js'));
+  fs.copyFileSync(path.join(__dirname, 'toml-parser.js'), path.join(configDir, 'toml-parser.js'));
   const settings = readSettings(settingsPath);
   if (settings) {
     const { changed: slRestored } = ensureStatusLine(settings);
     const { changed: hookAdded } = ensureHealHook(settings);
-    if (slRestored || hookAdded) {
+    const { changed: autoAdded } = ensureAutoUpdateHook(settings);
+    if (slRestored || hookAdded || autoAdded) {
       writeSettingsAtomic(settingsPath, settings);
       if (slRestored) log(`Restored statusLine in settings.json`);
       if (hookAdded) log(`Registered self-heal hooks (SessionStart + UserPromptSubmit)`);
+      if (autoAdded) log(`Registered auto-update hook (SessionStart)`);
     }
   }
 

@@ -43,6 +43,21 @@ describe('update', () => {
     assert.ok(logs.join('\n').includes('up to date'));
   });
 
+  // Like the self-heal payload, auto-update must be back-filled on EVERY update
+  // (even when already up to date) so existing installs gain it without a fresh
+  // install. This guards the migration path for users stuck on a pre-auto-update
+  // version — exactly the scenario that motivated the feature.
+  it('back-fills the auto-update payload + hook even when up to date', async () => {
+    fs.writeFileSync(path.join(configDir, '.version'), PKG_VERSION);
+    await update({ configDir, settingsPath, log: () => {} });
+    assert.ok(fs.existsSync(path.join(configDir, 'auto-update.mjs')), 'auto-update.mjs copied');
+    assert.ok(fs.existsSync(path.join(configDir, 'auto-update.js')), 'auto-update.js copied');
+    assert.ok(fs.existsSync(path.join(configDir, 'toml-parser.js')), 'toml-parser.js copied');
+    const settings = JSON.parse(fs.readFileSync(settingsPath, 'utf8'));
+    const cmds = (settings.hooks?.SessionStart ?? []).flatMap((e) => e.hooks.map((h) => h.command));
+    assert.ok(cmds.some((c) => c.includes('auto-update')), 'auto-update hook registered');
+  });
+
   it('updates files when version differs', async () => {
     fs.writeFileSync(path.join(configDir, '.version'), '0.9.0');
     fs.writeFileSync(path.join(configDir, 'statusline.sh'), 'old');

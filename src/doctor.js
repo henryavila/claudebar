@@ -2,6 +2,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 import { execSync } from 'node:child_process';
+import { parseTOML } from './toml-parser.js';
+import { DEFAULT_MODE } from './auto-update.js';
 
 function check(name, fn) {
   try {
@@ -92,6 +94,27 @@ export async function doctor({ configDir, settingsPath, log } = {}) {
       throw new Error(`hook registered but ensure-statusline.mjs missing — run: npx @henryavila/claudebar update`);
     }
     return `SessionStart → ensure-statusline.mjs`;
+  }));
+
+  results.push(check('auto-update', () => {
+    if (!fs.existsSync(path.join(configDir, 'auto-update.mjs'))) {
+      throw new Error(`payload missing — run: npx @henryavila/claudebar update`);
+    }
+    if (!fs.existsSync(settingsPath)) throw new Error(`settings.json not found`);
+    const settings = JSON.parse(fs.readFileSync(settingsPath, 'utf8'));
+    const sessionStart = settings?.hooks?.SessionStart ?? [];
+    const present = sessionStart.some((entry) =>
+      (entry?.hooks ?? []).some(
+        (h) => typeof h?.command === 'string' && h.command.includes('auto-update')
+      )
+    );
+    if (!present) throw new Error(`hook not registered — run: npx @henryavila/claudebar update`);
+    let mode = DEFAULT_MODE;
+    const toml = path.join(configDir, 'config.toml');
+    if (fs.existsSync(toml)) {
+      mode = parseTOML(fs.readFileSync(toml, 'utf8')).update?.auto_update ?? DEFAULT_MODE;
+    }
+    return `mode=${mode} (SessionStart → auto-update.mjs)`;
   }));
 
   results.push(check('version', () => {

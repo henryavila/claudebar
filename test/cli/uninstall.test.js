@@ -53,6 +53,30 @@ describe('uninstall', () => {
     assert.equal(fs.existsSync(configDir), false);
   });
 
+  it('removes the auto-update SessionStart hook (preserving foreign hooks)', async () => {
+    fs.writeFileSync(
+      settingsPath,
+      JSON.stringify(
+        {
+          statusLine: { type: 'command', command: '~/.config/claudebar/statusline.sh' },
+          hooks: {
+            SessionStart: [
+              { matcher: '*', hooks: [{ type: 'command', command: 'node ~/.config/claudebar/auto-update.mjs' }] },
+              { matcher: '*', hooks: [{ type: 'command', command: '/x/version-check.sh' }] },
+            ],
+          },
+        },
+        null,
+        2
+      )
+    );
+    await uninstall({ configDir, settingsPath, confirm: async () => true, log: () => {} });
+    const settings = JSON.parse(fs.readFileSync(settingsPath, 'utf8'));
+    const cmds = (settings.hooks?.SessionStart ?? []).flatMap((e) => e.hooks.map((h) => h.command));
+    assert.ok(!cmds.some((c) => c.includes('auto-update')), 'auto-update hook removed');
+    assert.ok(cmds.some((c) => c.includes('version-check.sh')), 'foreign hook preserved');
+  });
+
   it('creates backup of settings.json', async () => {
     await uninstall({
       configDir, settingsPath, confirm: async () => true, log: () => {},

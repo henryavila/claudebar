@@ -1,11 +1,12 @@
-const VALID_SECTIONS = ['layout', 'chips', 'thresholds', 'colors', 'glyphs'];
+const VALID_SECTIONS = ['layout', 'chips', 'thresholds', 'colors', 'glyphs', 'update'];
 
 const VALID_KEYS = {
+  update: ['auto_update', 'auto_update_interval_hours'],
   layout: ['force', 'refresh_interval'],
-  chips: ['model', 'effort', 'tmux', 'repo', 'branch', 'worktree', 'dirty', 'pr', 'agent', 'ctx_bar', 'five_hour_bar', 'seven_day_bar', 'countdown', 'time_marker'],
+  chips: ['model', 'effort', 'tmux', 'repo', 'branch', 'worktree', 'dirty', 'pr', 'agent', 'ctx_bar', 'five_hour_bar', 'seven_day_bar', 'countdown', 'time_marker', 'update'],
   thresholds: ['warning', 'critical'],
-  colors: ['model', 'model_dim', 'effort_low', 'effort_med', 'effort_high', 'effort_xhigh', 'effort_max', 'repo', 'worktree', 'branch', 'dirty', 'clean', 'pr_pending', 'pr_approved', 'pr_changes', 'pr_draft', 'bar_green', 'bar_yellow', 'bar_red', 'bar_dim', 'agent', 'tmux', 'separator'],
-  glyphs: ['sparkle', 'pencil', 'git', 'pr', 'tmux', 'gear', 'worktree'],
+  colors: ['model', 'model_dim', 'effort_low', 'effort_med', 'effort_high', 'effort_xhigh', 'effort_max', 'repo', 'worktree', 'branch', 'dirty', 'clean', 'pr_pending', 'pr_approved', 'pr_changes', 'pr_draft', 'bar_green', 'bar_yellow', 'bar_red', 'bar_dim', 'agent', 'tmux', 'separator', 'update'],
+  glyphs: ['sparkle', 'pencil', 'git', 'pr', 'tmux', 'gear', 'worktree', 'update'],
 };
 
 export function parseTOML(content) {
@@ -35,6 +36,8 @@ export function parseTOML(content) {
         const num = Number(val);
         config[section][key] = Number.isFinite(num) ? num : val;
       } else if (section === 'layout' && key === 'refresh_interval') {
+        config[section][key] = Number(val);
+      } else if (section === 'update' && key === 'auto_update_interval_hours') {
         config[section][key] = Number(val);
       } else {
         config[section][key] = val;
@@ -81,6 +84,18 @@ export function validateConfig(config) {
       if (section === 'layout' && key === 'force') {
         if (!['auto', 'compact', 'full'].includes(val)) {
           errors.push({ message: `[layout] force = ${val} — must be auto, compact, or full` });
+        }
+      }
+
+      if (section === 'update' && key === 'auto_update') {
+        if (!['patch', 'all', 'off'].includes(val)) {
+          errors.push({ message: `[update] auto_update = ${val} — must be patch, all, or off` });
+        }
+      }
+
+      if (section === 'update' && key === 'auto_update_interval_hours') {
+        if (typeof val !== 'number' || !Number.isInteger(val) || val < 1) {
+          errors.push({ message: `[update] auto_update_interval_hours = ${val} — must be a positive integer` });
         }
       }
     }

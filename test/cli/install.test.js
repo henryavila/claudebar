@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 import { install } from '../../src/install.js';
+import { parseTOML } from '../../src/toml-parser.js';
 
 const PKG_VERSION = JSON.parse(
   fs.readFileSync(new URL('../../package.json', import.meta.url), 'utf8')
@@ -104,5 +105,45 @@ describe('install', () => {
     const cmds = settings.hooks.SessionStart.flatMap((e) => e.hooks.map((h) => h.command));
     assert.ok(cmds.some((c) => c.includes('version-check.sh')), 'existing hook kept');
     assert.ok(cmds.some((c) => c.includes('ensure-statusline')), 'heal hook added');
+  });
+
+  it('copies the auto-update payload (auto-update.mjs + auto-update.js + toml-parser.js)', async () => {
+    await install({ configDir, settingsPath, log: () => {} });
+    assert.ok(fs.existsSync(path.join(configDir, 'auto-update.mjs')));
+    assert.ok(fs.existsSync(path.join(configDir, 'auto-update.js')));
+    assert.ok(fs.existsSync(path.join(configDir, 'toml-parser.js')), 'auto-update.js imports it');
+  });
+
+  it('registers the auto-update SessionStart hook (alongside the heal hook)', async () => {
+    await install({ configDir, settingsPath, log: () => {} });
+    const settings = JSON.parse(fs.readFileSync(settingsPath, 'utf8'));
+    const cmds = (settings.hooks?.SessionStart ?? []).flatMap((e) => e.hooks.map((h) => h.command));
+    assert.ok(cmds.some((c) => c.includes('auto-update')), 'auto-update hook registered');
+    assert.ok(cmds.some((c) => c.includes('ensure-statusline')), 'heal hook still present');
+  });
+
+  it('writes the interactively chosen auto_update mode into a fresh config.toml', async () => {
+    await install({ configDir, settingsPath, chooseMode: async () => 'all', log: () => {} });
+    const cfg = parseTOML(fs.readFileSync(path.join(configDir, 'config.toml'), 'utf8'));
+    assert.equal(cfg.update?.auto_update, 'all');
+  });
+
+  it('with no TTY choice (null) leaves config at the commented patch default', async () => {
+    await install({ configDir, settingsPath, chooseMode: async () => null, log: () => {} });
+    const cfg = parseTOML(fs.readFileSync(path.join(configDir, 'config.toml'), 'utf8'));
+    assert.equal(cfg.update?.auto_update, undefined, 'stays commented → readConfig falls back to patch');
+  });
+
+  it('does NOT prompt or overwrite the mode when config.toml already exists', async () => {
+    fs.mkdirSync(configDir, { recursive: true });
+    fs.writeFileSync(path.join(configDir, 'config.toml'), '[update]\nauto_update = "off"\n');
+    await install({
+      configDir,
+      settingsPath,
+      chooseMode: async () => { throw new Error('must not prompt when config exists'); },
+      log: () => {},
+    });
+    const cfg = parseTOML(fs.readFileSync(path.join(configDir, 'config.toml'), 'utf8'));
+    assert.equal(cfg.update?.auto_update, 'off', 'existing user mode preserved');
   });
 });

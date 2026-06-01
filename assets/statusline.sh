@@ -12,6 +12,9 @@ have() { command -v "$1" >/dev/null 2>&1; }
 _CB_SCRIPT_DIR="${BASH_SOURCE[0]%/*}"
 [[ "$_CB_SCRIPT_DIR" == "${BASH_SOURCE[0]}" ]] && _CB_SCRIPT_DIR="."
 _CB_CONFIG_TOML="$_CB_SCRIPT_DIR/config.toml"
+# The auto-updater drops the latest available version here for the update chip.
+# Overridable for tests; defaults to the install dir alongside this script.
+_CB_UPDATE_FILE="${CLAUDEBAR_UPDATE_FILE:-$_CB_SCRIPT_DIR/.update-available}"
 
 if [[ -f "$_CB_CONFIG_TOML" ]]; then
     _CB_CONFIG_SH="$_CB_SCRIPT_DIR/config.sh"
@@ -46,6 +49,7 @@ readonly C_BAR_DIM=${C_BAR_DIM:-238}
 readonly C_AGENT=${C_AGENT:-141}
 readonly C_TMUX=${C_TMUX:-105}
 readonly C_SEP=${C_SEP:-238}
+readonly C_UPDATE=${C_UPDATE:-220}
 
 # ─── Quota window durations (seconds) — used by the time-elapsed marker ─
 # Anthropic's rate-limit windows are nominally 5 hours and 7 days. We pin
@@ -78,6 +82,9 @@ readonly GLYPH_PR=${GLYPH_PR:-$'\xef\x90\x87'}
 readonly GLYPH_TMUX=${GLYPH_TMUX:-$'\xef\x86\xb2'}
 readonly GLYPH_GEAR=${GLYPH_GEAR:-$'\xef\x82\x85'}
 readonly GLYPH_FOLDER=${GLYPH_FOLDER:-$'\xef\x81\xbb'}
+# GLYPH_UPDATE U+2B06 (upwards arrow) — "update available" chip. Not a Private
+# Use Area glyph, so a literal byte sequence is safe here.
+readonly GLYPH_UPDATE=${GLYPH_UPDATE:-$'\xe2\xac\x86'}
 
 # ─── Chip toggle defaults ────────────────────────────────────────────
 readonly CHIP_MODEL=${CHIP_MODEL:-1}
@@ -94,6 +101,7 @@ readonly CHIP_FIVE_HOUR_BAR=${CHIP_FIVE_HOUR_BAR:-1}
 readonly CHIP_SEVEN_DAY_BAR=${CHIP_SEVEN_DAY_BAR:-1}
 readonly CHIP_COUNTDOWN=${CHIP_COUNTDOWN:-1}
 readonly CHIP_TIME_MARKER=${CHIP_TIME_MARKER:-1}
+readonly CHIP_UPDATE=${CHIP_UPDATE:-1}
 
 # ─── ANSI helpers ──────────────────────────────────────────────────────
 esc=$'\033'
@@ -284,6 +292,13 @@ compact_row1() {
     if [[ -n "$pr_number" ]] && (( CHIP_PR )); then
         printf '  '
         pr_chip "$pr_number" "$pr_state"
+    fi
+
+    local upd
+    upd=$(update_chip)
+    if [[ -n "$upd" ]]; then
+        printf '  '
+        printf '%s' "$upd"
     fi
 
     printf '\n'
@@ -487,6 +502,21 @@ branch_chip() {
     fi
 }
 
+# ─── update_chip — "⬆ vX.Y.Z" when the auto-updater found a newer release ──
+# Reads the version the background updater wrote to .update-available. Prints
+# nothing when the file is absent/blank or CHIP_UPDATE is off. Accepts an
+# explicit path as $1 (tests); otherwise uses the resolved _CB_UPDATE_FILE.
+update_chip() {
+    (( CHIP_UPDATE )) || return 0
+    local f="${1:-$_CB_UPDATE_FILE}"
+    [[ -f "$f" ]] || return 0
+    local ver
+    ver=$(<"$f")
+    ver=${ver//[$'\n\r\t ']/}
+    [[ -n "$ver" ]] || return 0
+    fg "$C_UPDATE" "${GLYPH_UPDATE} v${ver}"
+}
+
 # ─── identity_row — compose row 1 ─────────────────────────────────────
 # Usage: identity_row key=value key=value ...
 # Keys: model effort owner repo worktree branch dirty_count
@@ -573,6 +603,14 @@ identity_row() {
     if [[ -n "$pr_number" ]] && (( CHIP_PR )); then
         printf '   '
         pr_chip "$pr_number" "$pr_state"
+    fi
+
+    # ── Update-available chip ────────────────────────────
+    local upd
+    upd=$(update_chip)
+    if [[ -n "$upd" ]]; then
+        printf '   '
+        printf '%s' "$upd"
     fi
 
     printf '\n'

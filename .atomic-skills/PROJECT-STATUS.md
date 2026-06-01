@@ -1,5 +1,5 @@
 ---
-last_updated: 2026-06-01T09:24:05Z
+last_updated: 2026-06-01T12:45:00Z
 active_count: 3
 archived_count: 3
 ---
@@ -14,7 +14,7 @@ Canonical entry point. Auto-updated by `atomic-skills:project-status`. Read firs
 |---|---|---|---|---|
 | npm-distribution | active | 2026-05-26 | — | Create package.json and bin/cli.js scaffold per spec architecture |
 | midsession-selfheal | active | 2026-06-01 | — | TDD: register heal on UserPromptSubmit for mid-session statusLine recovery |
-| auto-update | active | 2026-06-01 | — | Fase 1 red-first: testes de decideUpdate() (semver) — ver handoff na initiative |
+| auto-update | active | 2026-06-01 | — | FASE 1+2 COMPLETAS (129 CLI + 39 bash green). Restante: deploy/verify na máquina real (pedir antes) + commit/PR |
 
 ## Recently Archived (last 10)
 

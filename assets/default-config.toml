@@ -25,6 +25,7 @@
 # seven_day_bar = true
 # countdown = true
 # time_marker = true
+# update = true
 
 [thresholds]
 # warning = 60
@@ -54,6 +55,7 @@
 # agent = 141
 # tmux = 105
 # separator = 238
+# update = 220
 
 [glyphs]
 # sparkle = "✦"
@@ -63,3 +65,12 @@
 # tmux = ""
 # gear = ""
 # worktree = "⎇"
+# update = "⬆"
+
+[update]
+# Auto-update mode (checked once per session, throttled, in the background):
+#   "patch" — auto-apply hotfixes (1.1.x) only; minor/major just notify  [default]
+#   "all"   — auto-apply every newer release
+#   "off"   — never check or update
+# auto_update = "patch"
+# auto_update_interval_hours = 24
