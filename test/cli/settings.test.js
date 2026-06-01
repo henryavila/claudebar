@@ -6,6 +6,8 @@ import {
   setStatusLine,
   ensureHealHook,
   removeHealHook,
+  ensureAutoUpdateHook,
+  removeAutoUpdateHook,
   STATUSLINE_COMMAND,
 } from '../../src/settings.js';
 
@@ -177,5 +179,92 @@ describe('settings.removeHealHook', () => {
     assert.ok(ups.some((c) => c.includes('lint.sh')), 'foreign UserPromptSubmit hook preserved');
     assert.ok(!ups.some((c) => c.includes('ensure-statusline')), 'heal hook removed from UserPromptSubmit');
     assert.ok(!s.hooks.SessionStart, 'SessionStart pruned (heal was its only entry)');
+  });
+});
+
+// The auto-update hook is SessionStart-ONLY (locked decision: the check never
+// runs on UserPromptSubmit nor in the render path — only at session start, then
+// throttled by a timestamp). It must coexist with the heal hook on SessionStart.
+describe('settings.ensureAutoUpdateHook', () => {
+  function sessionStartCommands(s) {
+    return (s.hooks?.SessionStart ?? []).flatMap((e) => (e.hooks ?? []).map((h) => h.command));
+  }
+
+  it('adds a SessionStart hook when none exists', () => {
+    const s = {};
+    const { changed } = ensureAutoUpdateHook(s);
+    assert.equal(changed, true);
+    assert.ok(sessionStartCommands(s).some((c) => c.includes('auto-update')));
+  });
+
+  it('registers ONLY on SessionStart, never on UserPromptSubmit', () => {
+    const s = {};
+    ensureAutoUpdateHook(s);
+    const ups = (s.hooks.UserPromptSubmit ?? []).flatMap((e) => (e.hooks ?? []).map((h) => h.command));
+    assert.ok(!ups.some((c) => c.includes('auto-update')), 'must not register on UserPromptSubmit');
+  });
+
+  it('is idempotent — does not duplicate the hook', () => {
+    const s = {};
+    ensureAutoUpdateHook(s);
+    const { changed } = ensureAutoUpdateHook(s);
+    assert.equal(changed, false);
+    const count = sessionStartCommands(s).filter((c) => c.includes('auto-update')).length;
+    assert.equal(count, 1);
+  });
+
+  it('coexists with the heal hook on SessionStart (both present, neither duplicated)', () => {
+    const s = {};
+    ensureHealHook(s);
+    ensureAutoUpdateHook(s);
+    const cmds = sessionStartCommands(s);
+    assert.ok(cmds.some((c) => c.includes('ensure-statusline')), 'heal present');
+    assert.ok(cmds.some((c) => c.includes('auto-update')), 'auto-update present');
+    assert.equal(cmds.filter((c) => c.includes('auto-update')).length, 1);
+  });
+
+  it('preserves pre-existing SessionStart hooks', () => {
+    const s = {
+      hooks: { SessionStart: [{ matcher: '*', hooks: [{ type: 'command', command: '/other/x.sh' }] }] },
+    };
+    ensureAutoUpdateHook(s);
+    const cmds = sessionStartCommands(s);
+    assert.ok(cmds.some((c) => c.includes('x.sh')), 'foreign hook kept');
+    assert.ok(cmds.some((c) => c.includes('auto-update')), 'auto-update added');
+  });
+});
+
+describe('settings.removeAutoUpdateHook', () => {
+  function sessionStartCommands(s) {
+    return (s.hooks?.SessionStart ?? []).flatMap((e) => (e.hooks ?? []).map((h) => h.command));
+  }
+
+  it('removes our hook but keeps others', () => {
+    const s = {
+      hooks: { SessionStart: [{ matcher: '*', hooks: [{ type: 'command', command: '/other/x.sh' }] }] },
+    };
+    ensureAutoUpdateHook(s);
+    const { changed } = removeAutoUpdateHook(s);
+    assert.equal(changed, true);
+    const cmds = sessionStartCommands(s);
+    assert.ok(cmds.some((c) => c.includes('x.sh')), 'other hook preserved');
+    assert.ok(!cmds.some((c) => c.includes('auto-update')), 'auto-update hook gone');
+  });
+
+  it('leaves the heal hook intact when removing only auto-update', () => {
+    const s = {};
+    ensureHealHook(s);
+    ensureAutoUpdateHook(s);
+    const { changed } = removeAutoUpdateHook(s);
+    assert.equal(changed, true);
+    const cmds = sessionStartCommands(s);
+    assert.ok(cmds.some((c) => c.includes('ensure-statusline')), 'heal hook preserved');
+    assert.ok(!cmds.some((c) => c.includes('auto-update')), 'auto-update hook removed');
+  });
+
+  it('is a no-op when no auto-update hook present', () => {
+    const s = { hooks: { SessionStart: [] } };
+    const { changed } = removeAutoUpdateHook(s);
+    assert.equal(changed, false);
   });
 });

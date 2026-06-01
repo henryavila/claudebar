@@ -4,6 +4,7 @@ import os from 'node:os';
 import { spawnSync } from 'node:child_process';
 import { parseTOML, validateConfig } from './toml-parser.js';
 import { compileConfig } from './config-compiler.js';
+import { setModeInToml, DEFAULT_MODE } from './auto-update.js';
 import { fileURLToPath } from 'node:url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -48,6 +49,40 @@ export async function config({ configDir, editor, log } = {}) {
   return { valid: true };
 }
 
+// `config auto-update [patch|all|off]` — change (or report) the auto-update mode
+// without opening an editor. Generates a default config.toml if none exists.
+export async function configAutoUpdate({ configDir, mode, log } = {}) {
+  configDir ??= path.join(os.homedir(), '.config', 'claudebar');
+  log ??= console.log;
+
+  const configToml = path.join(configDir, 'config.toml');
+  if (!fs.existsSync(configToml)) {
+    fs.mkdirSync(configDir, { recursive: true });
+    fs.copyFileSync(path.join(ASSETS_DIR, 'default-config.toml'), configToml);
+    log(`Generated config.toml from defaults`);
+  }
+
+  // No mode → report the current effective value (default when unset).
+  if (!mode) {
+    const current = parseTOML(fs.readFileSync(configToml, 'utf8')).update?.auto_update ?? DEFAULT_MODE;
+    log(`auto-update mode: ${current}`);
+    return { mode: current };
+  }
+
+  if (!['patch', 'all', 'off'].includes(mode)) {
+    log(`Invalid mode "${mode}" — choose patch, all, or off.`);
+    return { valid: false };
+  }
+
+  fs.writeFileSync(configToml, setModeInToml(fs.readFileSync(configToml, 'utf8'), mode));
+  log(`auto-update mode set to: ${mode}`);
+  return { valid: true, mode };
+}
+
 export default async function main(args) {
+  if (args?.[0] === 'auto-update') {
+    await configAutoUpdate({ mode: args[1] });
+    return;
+  }
   await config();
 }

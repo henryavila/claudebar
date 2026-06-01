@@ -2,7 +2,7 @@
 initiative_id: auto-update
 status: active
 started: 2026-06-01
-last_updated: 2026-06-01T11:44:49Z
+last_updated: 2026-06-01T12:30:00Z
 branch:
 worktree:
 plan_link:
@@ -19,7 +19,7 @@ stack:
 tasks: {}
 parked: []
 emerged: []
-next_action: "Fase 1, red-first: escrever testes de decideUpdate() (semver) em test/cli/auto-update.test.js antes de qualquer código"
+next_action: "FASE 1 + FASE 2 COMPLETAS (129 CLI + 39 bash green). Restante: (1) deploy/verify na máquina real (rodar `update` p/ instalar chip+hook — PEDIR ao usuário antes), (2) commit + PR."
 ---
 
 # Auto-update — usuário recebe correções na hora
@@ -98,6 +98,54 @@ E em `test/cli/settings.test.js`: `ensureAutoUpdateHook` registra/idempotente/pr
   (versão) pra minor/major. Instalador interativo. Hook registrado por install/update.
 - **Fase 2:** chip "⬆ vX" na `statusline.sh` lendo `.update-available`; subcomando
   `config` pra trocar o modo depois; talvez `doctor` reportar status do auto-update.
+
+## Progresso (sessão 2026-06-01, cont.)
+
+- ✅ **Fase 1 / decideUpdate** — `src/auto-update.js` criado com `decideUpdate(installed, latest, mode)`
+  + helpers puros `parseSemver`/`compareCore` (sem npm `semver`). 11 testes red→green em
+  `test/cli/auto-update.test.js` cobrindo os 10 casos da test list (patch/minor/major × patch/all/off,
+  igual, downgrade, lixo não-semver sem throw, pré-release nunca auto-aplica).
+- ✅ **Fase 1 / registro de hook** — `ensureAutoUpdateHook`/`removeAutoUpdateHook` em `src/settings.js`
+  (SessionStart-ONLY, marker `auto-update`, `AUTO_UPDATE_HOOK_COMMAND = node ~/.config/claudebar/auto-update.mjs`).
+  Espelha o heal mas single-event. +12 testes em `test/cli/settings.test.js` (coexiste com heal,
+  idempotente, remove sem tocar no heal, nunca em UserPromptSubmit). Suíte CLI: **97/97 green**.
+- ✅ **Config `[update]`** — decisão travada: seção `[update]` (parser é section-scoped). Adicionada a
+  `VALID_SECTIONS`/`VALID_KEYS` + coerção numérica do `auto_update_interval_hours` + validação
+  (`patch|all|off`, inteiro ≥1) em `src/toml-parser.js`. Seção comentada em `assets/default-config.toml`.
+- ✅ **runAutoUpdate + I/O** — em `src/auto-update.js`: `runAutoUpdate` (config→portão timestamp→fetch→
+  decide→apply/notify, deps injetadas, nunca throw), `fetchLatestVersion` (fetch nativo, null em falha),
+  `applyUpdate` (spawn `npx @latest update` detached, log), `readConfig` (best-effort→defaults).
+  Exports `DEFAULT_MODE='patch'`, `DEFAULT_INTERVAL_HOURS=24`. +9 testes (throttle, offline silencioso,
+  timestamp sempre fresco, notify grava `.update-available`, off inerte, up-to-date limpa stale).
+- ✅ **Hook `assets/auto-update.mjs`** — SessionStart-only, 2 modos: bare→re-spawna `--run` DETACHED e
+  sai 0 na hora (sessão nunca espera rede); `--run`→worker faz o check. Silencioso/best-effort.
+  +2 testes em `test/cli/auto-update-hook.test.js`.
+- ✅ **Wiring** — `install.js`/`update.js` copiam o payload (auto-update.mjs+auto-update.js+toml-parser.js)
+  e registram o hook; `update` faz back-fill em TODO update (antes do gate de versão, igual heal);
+  `uninstall.js` remove o hook. +5 testes (install×2, update back-fill, uninstall preserva alheios).
+- ✅ **Instalador interativo** — `install.js` `promptAutoUpdateMode` (readline, TTY-safe: sem TTY→null→
+  mantém default; nunca bloqueia CI) + `applyAutoUpdateMode` (ativa a linha comentada do template);
+  só pergunta em install fresh, nunca clobbera config existente. dep `chooseMode` injetável. +3 testes.
+
+**Fase 1: 119 CLI + 38 bash green.**
+
+## Progresso — FASE 2 (chip + config + doctor)
+
+- ✅ **Chip `⬆ vX`** — `update_chip()` em `assets/statusline.sh` lê `~/.config/claudebar/.update-available`
+  (override `CLAUDEBAR_UPDATE_FILE`), renderiza `⬆ v<ver>` em `C_UPDATE` (dourado 220, glyph U+2B06).
+  Aparece no fim do `identity_row` e do `compact_row1`. Toggle `CHIP_UPDATE` (default 1). Configurável
+  via `[chips] update`, `[colors] update`, `[glyphs] update` (adicionados a VALID_KEYS + default-config).
+  +1 unit test `test/unit/test-update-chip.sh` (presente/oculto/ausente/blank/integração).
+- ✅ **`config auto-update [patch|all|off]`** — `configAutoUpdate()` em `src/config.js` (set valida e grava;
+  sem arg reporta o modo efetivo; gera config.toml default se ausente). Roteado no `main(args)`. Usa o
+  helper PURO `setModeInToml(content, mode)` em `auto-update.js` (ativa/substitui a linha onde quer que
+  esteja, nunca toca no interval). install.js refatorado p/ reusar o mesmo helper. +4 testes config +4 puros.
+- ✅ **doctor** — check `auto-update` reporta `mode=X` + payload+hook presentes (falha→manda rodar update).
+  +2 testes em `doctor.test.js`. Help do CLI (`bin/cli.js`) documenta o subcomando.
+- ✅ Smoke real: chip renderiza dourado após o branch; `config auto-update all` grava `auto_update = "all"`
+  (parse confirma); modo inválido rejeitado sem escrever.
+
+**Total acumulado: 129 testes CLI + 39 bash, 100% green.** Falta só deploy-na-máquina-real + commit/PR.
 
 ## Estado ao entrar na sessão nova
 

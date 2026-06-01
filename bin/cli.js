@@ -22,6 +22,7 @@ Commands:
   install        Install statusline to ~/.config/claudebar/
   update         Update to latest version (preserves config)
   config         Edit config.toml in $EDITOR
+                   config auto-update [patch|all|off]  set/show auto-update mode
   doctor         Diagnose installation
   uninstall      Remove statusline
   install-font   Install a Nerd Font

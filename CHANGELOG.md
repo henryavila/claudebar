@@ -1,5 +1,19 @@
 # Changelog
 
+## v1.2.0 — 2026-06-01
+
+### Auto-update — fixes reach you on their own
+
+claudebar now keeps itself up to date in the background, so a published fix arrives without you running `update` by hand. A SessionStart hook spawns a detached, throttled check (once per day by default) that reads the latest published version and decides what to do based on the configured mode:
+
+- **`patch`** (default) — auto-applies hotfixes (`1.1.x`) only; a minor/major release just *notifies* (it never installs a feature or breaking change on its own).
+- **`all`** — auto-applies every newer release.
+- **`off`** — never checks or updates.
+
+The decision runs entirely in the already-installed local code and only reads a version string from the network; the apply step is exactly the same `npx @henryavila/claudebar@latest update` you'd run manually. The check never blocks a session start: it's detached, fails silently when offline, and is gated by a timestamp so it costs a single `stat` on most launches. On install, an interactive prompt offers the mode (TTY only; CI falls back to the default).
+
+When a minor/major update is available, the statusline shows an **`⬆ vX.Y.Z`** chip. Change the mode any time with **`claudebar config auto-update [patch|all|off]`** (no argument prints the current mode), and **`claudebar doctor`** now reports the auto-update status and mode. Everything is configurable via the new `[update]` section in `config.toml` and the `update` chip/color/glyph keys.
+
 ## v1.1.1 — 2026-05-29
 
 ### Fix: location always visible outside git repos

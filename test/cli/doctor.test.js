@@ -50,4 +50,26 @@ describe('doctor', () => {
     const check = results.find(r => r.name === 'settings.json');
     assert.equal(check.pass, true);
   });
+
+  it('reports auto-update status: passes and shows the mode when wired up', async () => {
+    fs.writeFileSync(path.join(configDir, 'auto-update.mjs'), '// hook');
+    fs.writeFileSync(path.join(configDir, 'config.toml'), '[update]\nauto_update = "all"\n');
+    fs.writeFileSync(settingsPath, JSON.stringify({
+      hooks: { SessionStart: [{ matcher: '*', hooks: [{ type: 'command', command: 'node ~/.config/claudebar/auto-update.mjs' }] }] },
+    }));
+    const { results } = await doctor({ configDir, settingsPath, log: () => {} });
+    const check = results.find(r => r.name === 'auto-update');
+    assert.ok(check, 'auto-update check present');
+    assert.equal(check.pass, true);
+    assert.ok(check.message.includes('all'), 'reports the configured mode');
+  });
+
+  it('auto-update check fails when the hook is not registered', async () => {
+    fs.writeFileSync(path.join(configDir, 'auto-update.mjs'), '// hook');
+    fs.writeFileSync(path.join(configDir, 'config.toml'), '[update]\nauto_update = "patch"\n');
+    fs.writeFileSync(settingsPath, JSON.stringify({ hooks: { SessionStart: [] } }));
+    const { results } = await doctor({ configDir, settingsPath, log: () => {} });
+    const check = results.find(r => r.name === 'auto-update');
+    assert.equal(check.pass, false);
+  });
 });
