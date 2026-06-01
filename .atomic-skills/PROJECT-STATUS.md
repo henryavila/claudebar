@@ -14,7 +14,7 @@ Canonical entry point. Auto-updated by `atomic-skills:project-status`. Read firs
 |---|---|---|---|---|
 | npm-distribution | active | 2026-05-26 | — | Create package.json and bin/cli.js scaffold per spec architecture |
 | midsession-selfheal | active | 2026-06-01 | — | TDD: register heal on UserPromptSubmit for mid-session statusLine recovery |
-| auto-update | active | 2026-06-01 | fix/installer-reinstall-prompt | PR #13 aberta (reinstall oferece escolha de auto-update, v1.2.1). Aguardando merge → release publica no npm via OIDC |
+| auto-update | shipped | 2026-06-01 | — | DONE: PR #13 merged (43ce411), release v1.2.1 publicado no npm via OIDC (latest=1.2.1). Reinstall agora oferece escolha de auto-update |
 
 ## Recently Archived (last 10)
 
