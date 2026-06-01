@@ -19,7 +19,7 @@ stack:
 tasks: {}
 parked: []
 emerged: []
-next_action: "Commit + release (patch bump) do refinamento do instalador (reinstall oferece escolha de auto-update). Implementado + testado, ainda não comitado."
+next_action: "PR #13 aberta (branch fix/installer-reinstall-prompt, v1.2.1). Mergear → o release/OIDC publica 1.2.1 no npm. Opcional: rodar `update` na máquina real."
 ---
 
 # Auto-update — usuário recebe correções na hora
