@@ -1,6 +1,6 @@
 ---
 initiative_id: auto-update
-status: active
+status: shipped
 started: 2026-06-01
 last_updated: 2026-06-01T12:30:00Z
 branch:
@@ -19,7 +19,7 @@ stack:
 tasks: {}
 parked: []
 emerged: []
-next_action: "FASE 1 + FASE 2 COMPLETAS (129 CLI + 39 bash green). Restante: (1) deploy/verify na máquina real (rodar `update` p/ instalar chip+hook — PEDIR ao usuário antes), (2) commit + PR."
+next_action: "SHIPPED — PR #12 merged → main (ed8d492); release v1.2.0 publicado no npm via OIDC (latest=1.2.0). Opcional: rodar `update` na máquina real p/ ativar chip+hook localmente."
 ---
 
 # Auto-update — usuário recebe correções na hora
