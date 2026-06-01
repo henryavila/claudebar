@@ -62,4 +62,113 @@ describe('ensure-statusline.mjs (self-heal hook)', () => {
     assert.doesNotThrow(() => runHeal(installDir, missing));
     assert.ok(!fs.existsSync(missing), 'does not create settings.json from nothing');
   });
+
+  // Helper: collect the command strings registered under SessionStart.
+  function sessionStartCommands(settings) {
+    return (settings.hooks?.SessionStart ?? []).flatMap((e) =>
+      (e.hooks ?? []).map((h) => h.command)
+    );
+  }
+
+  // Integration — the DEPLOYED heal script must wire the mid-session recovery
+  // event (UserPromptSubmit), not just SessionStart. This guards the end-to-end
+  // path: ensure-statusline.mjs → ensureHealHook → both events.
+  it('registers the heal on UserPromptSubmit for mid-session recovery', () => {
+    fs.writeFileSync(settingsPath, JSON.stringify({ hooks: {} }, null, 2));
+    runHeal(installDir, settingsPath);
+    const settings = JSON.parse(fs.readFileSync(settingsPath, 'utf8'));
+    const ups = (settings.hooks?.UserPromptSubmit ?? []).flatMap((e) =>
+      (e.hooks ?? []).map((h) => h.command)
+    );
+    assert.ok(ups.some((c) => c.includes('ensure-statusline')), 'UserPromptSubmit heal registered');
+  });
+
+  // Regression — the exact field-validated user state: Claude Code (or a
+  // co-installed tool overwriting hooks.SessionStart) left settings.json with
+  // NO statusLine AND NO ensure-statusline hook, while an unrelated
+  // version-check SessionStart hook survived. Healing must restore BOTH the
+  // statusLine and its own hook registration, and preserve the foreign hook.
+  it('restores its own heal hook (and statusLine) when both were dropped', () => {
+    fs.writeFileSync(
+      settingsPath,
+      JSON.stringify(
+        {
+          hooks: {
+            SessionStart: [
+              {
+                matcher: '*',
+                hooks: [
+                  { type: 'command', command: '/Users/henry/.atomic-skills/hooks/version-check.sh' },
+                ],
+              },
+            ],
+          },
+          effortLevel: 'high',
+          skipDangerousModePermissionPrompt: true,
+        },
+        null,
+        2
+      )
+    );
+    runHeal(installDir, settingsPath);
+    const settings = JSON.parse(fs.readFileSync(settingsPath, 'utf8'));
+    const cmds = sessionStartCommands(settings);
+    assert.ok(settings.statusLine?.command.includes('claudebar'), 'statusLine restored');
+    assert.ok(cmds.some((c) => c.includes('ensure-statusline')), 'heal hook re-registered');
+    assert.ok(cmds.some((c) => c.includes('version-check.sh')), 'foreign hook preserved');
+  });
+
+  // Edge — only the heal hook was dropped (statusLine still points somewhere
+  // the user chose). Heal must re-add its hook without clobbering statusLine.
+  it('re-registers its hook without touching a present statusLine', () => {
+    fs.writeFileSync(
+      settingsPath,
+      JSON.stringify({ statusLine: { type: 'command', command: '/keep/me.sh' }, hooks: {} }, null, 2)
+    );
+    runHeal(installDir, settingsPath);
+    const settings = JSON.parse(fs.readFileSync(settingsPath, 'utf8'));
+    assert.equal(settings.statusLine.command, '/keep/me.sh', 'statusLine untouched');
+    assert.ok(
+      sessionStartCommands(settings).some((c) => c.includes('ensure-statusline')),
+      'heal hook re-registered'
+    );
+  });
+
+  // Edge — hook already present, statusLine dropped. Heal restores statusLine
+  // and must NOT duplicate its own hook.
+  it('restores statusLine without duplicating an existing heal hook', () => {
+    fs.writeFileSync(
+      settingsPath,
+      JSON.stringify(
+        {
+          hooks: {
+            SessionStart: [
+              { matcher: '*', hooks: [{ type: 'command', command: 'node ~/.config/claudebar/ensure-statusline.mjs' }] },
+            ],
+          },
+        },
+        null,
+        2
+      )
+    );
+    runHeal(installDir, settingsPath);
+    const settings = JSON.parse(fs.readFileSync(settingsPath, 'utf8'));
+    assert.ok(settings.statusLine?.command.includes('claudebar'), 'statusLine restored');
+    const healCount = sessionStartCommands(settings).filter((c) => c.includes('ensure-statusline')).length;
+    assert.equal(healCount, 1, 'heal hook not duplicated');
+  });
+
+  // Idempotency — when both statusLine and the hook are already correct, a heal
+  // run must not churn the file (no-op write would dirty mtime / git status).
+  it('does not rewrite settings.json when nothing is missing', () => {
+    // Seed once via heal so the file is in canonical post-heal form.
+    fs.writeFileSync(settingsPath, JSON.stringify({ hooks: {} }, null, 2));
+    runHeal(installDir, settingsPath);
+    const before = fs.readFileSync(settingsPath, 'utf8');
+    const mtimeBefore = fs.statSync(settingsPath).mtimeMs;
+    runHeal(installDir, settingsPath);
+    const after = fs.readFileSync(settingsPath, 'utf8');
+    assert.equal(after, before, 'content unchanged on second heal');
+    assert.equal(fs.statSync(settingsPath).mtimeMs, mtimeBefore, 'file not rewritten');
+  });
 });
