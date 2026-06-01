@@ -2,7 +2,7 @@
 initiative_id: auto-update
 status: shipped
 started: 2026-06-01
-last_updated: 2026-06-01T12:30:00Z
+last_updated: 2026-06-01T13:07:57Z
 branch:
 worktree:
 plan_link:
@@ -19,7 +19,7 @@ stack:
 tasks: {}
 parked: []
 emerged: []
-next_action: "SHIPPED — PR #12 merged → main (ed8d492); release v1.2.0 publicado no npm via OIDC (latest=1.2.0). Opcional: rodar `update` na máquina real p/ ativar chip+hook localmente."
+next_action: "PR #13 aberta (branch fix/installer-reinstall-prompt, v1.2.1). Mergear → o release/OIDC publica 1.2.1 no npm. Opcional: rodar `update` na máquina real."
 ---
 
 # Auto-update — usuário recebe correções na hora
@@ -146,6 +146,25 @@ E em `test/cli/settings.test.js`: `ensureAutoUpdateHook` registra/idempotente/pr
   (parse confirma); modo inválido rejeitado sem escrever.
 
 **Total acumulado: 129 testes CLI + 39 bash, 100% green.** Falta só deploy-na-máquina-real + commit/PR.
+
+## Frame 2 (2026-06-01) — instalador oferece escolha na REINSTALAÇÃO
+
+- **Caso de uso:** usuário rodou `npx … install` por cima de um config.toml já existente (de install
+  anterior). O prompt de auto-update só rodava em install fresh (dentro do `if (!existsSync)`), então a
+  reinstalação só logava `config.toml already exists — preserved` e nunca oferecia a escolha do modo.
+- ✅ **install.js refatorado** — extraído `offerAutoUpdateChoice(configToml, chooseMode, log)` (prompt+grava,
+  compartilhado pelos dois caminhos) e `hasExplicitMode(configToml)` (parseTOML → `cfg.update?.auto_update
+  != null`; linha comentada/ausente = não escolhido → pode oferecer; config não-parseável = tratado como
+  comprometido → nunca clobbera um arquivo hand-edited). No branch de reinstall, se `!hasExplicitMode` →
+  `offerAutoUpdateChoice`. `setModeInToml` só toca a linha `auto_update`, então todo o resto da config do
+  usuário fica intacto. Modo já setado é preservado (nunca re-pergunta).
+- ✅ **+3 testes** em `test/cli/install.test.js`: (a) reinstall com template comentado → prompt grava o modo
+  escolhido; (b) reinstall com modo explícito → NÃO re-pergunta (chooseMode lança se chamado), modo
+  preservado; (c) reinstall headless (null) → segue comentado. Suíte: **132 CLI + 39 bash green**.
+- ✅ **Smoke real:** reinstall sobre default-config.toml com TTY escolhendo "off" → loga `preserved` +
+  `Set auto-update mode: off`, grava `auto_update = "off"`, e diff confirma que SÓ a linha auto_update
+  mudou (resto byte-idêntico ao template).
+- **Pendente:** commit + patch release.
 
 ## Estado ao entrar na sessão nova
 

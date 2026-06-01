@@ -1,5 +1,11 @@
 # Changelog
 
+## v1.2.1 — 2026-06-01
+
+### Fix: installer offers the auto-update choice on reinstall
+
+The interactive auto-update prompt only appeared on a clean install. Reinstalling over an existing `config.toml` logged `config.toml already exists — preserved` and skipped the prompt entirely, so anyone who first installed before the prompt existed (or in a non-TTY context) could never pick a mode through the installer. The installer now also offers the choice on reinstall **when no explicit `auto_update` mode has been set yet** (the shipped line is commented). An already-chosen mode is preserved and never re-prompted, and only the `auto_update` line is touched — every other setting in your config is left exactly as-is.
+
 ## v1.2.0 — 2026-06-01
 
 ### Auto-update — fixes reach you on their own

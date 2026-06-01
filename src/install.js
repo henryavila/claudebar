@@ -40,6 +40,29 @@ function applyAutoUpdateMode(configToml, mode) {
   fs.writeFileSync(configToml, setModeInToml(fs.readFileSync(configToml, 'utf8'), mode));
 }
 
+// Has the user already committed to an explicit auto_update mode? A commented
+// template line or a missing key both read back as undefined → "not chosen yet",
+// so a reinstall may offer the prompt. An unparseable custom config is treated as
+// committed (return true) so we never risk clobbering a hand-edited file.
+function hasExplicitMode(configToml) {
+  try {
+    const cfg = parseTOML(fs.readFileSync(configToml, 'utf8'));
+    return cfg.update?.auto_update != null;
+  } catch {
+    return true;
+  }
+}
+
+// Prompt for the mode and, if one is chosen, persist it. Shared by fresh install
+// and the reinstall back-fill so both paths behave identically.
+async function offerAutoUpdateChoice(configToml, chooseMode, log) {
+  const mode = await chooseMode();
+  if (mode) {
+    applyAutoUpdateMode(configToml, mode);
+    log(`Set auto-update mode: ${mode}`);
+  }
+}
+
 function getVersion() {
   const pkg = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'package.json'), 'utf8'));
   return pkg.version;
@@ -88,15 +111,18 @@ export async function install({ configDir, settingsPath, chooseMode, log } = {})
     const defaultConfig = path.join(ASSETS_DIR, 'default-config.toml');
     fs.copyFileSync(defaultConfig, configToml);
     log(`Generated config.toml from defaults`);
-    // Only a fresh install offers the auto-update prompt — never clobber a mode
-    // the user already configured. A null choice (no TTY) keeps the default.
-    const mode = await chooseMode();
-    if (mode) {
-      applyAutoUpdateMode(configToml, mode);
-      log(`Set auto-update mode: ${mode}`);
-    }
+    // Fresh install: offer the auto-update prompt. A null choice (no TTY) keeps
+    // the shipped default ("patch", commented).
+    await offerAutoUpdateChoice(configToml, chooseMode, log);
   } else {
     log(`config.toml already exists — preserved`);
+    // Reinstall: if the user never picked a mode (line still commented/absent),
+    // offer the choice now. setModeInToml only touches the auto_update line, so
+    // every other setting they customized is left exactly as-is. An already-set
+    // mode is preserved — we never re-prompt or clobber it.
+    if (!hasExplicitMode(configToml)) {
+      await offerAutoUpdateChoice(configToml, chooseMode, log);
+    }
   }
 
   const configSh = path.join(configDir, 'config.sh');

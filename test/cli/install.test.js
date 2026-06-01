@@ -140,10 +140,42 @@ describe('install', () => {
     await install({
       configDir,
       settingsPath,
-      chooseMode: async () => { throw new Error('must not prompt when config exists'); },
+      chooseMode: async () => { throw new Error('must not prompt when an explicit mode exists'); },
       log: () => {},
     });
     const cfg = parseTOML(fs.readFileSync(path.join(configDir, 'config.toml'), 'utf8'));
     assert.equal(cfg.update?.auto_update, 'off', 'existing user mode preserved');
+  });
+
+  it('offers the choice on reinstall when no explicit mode was set yet (commented template)', async () => {
+    // First install kept the default: the auto_update line stays commented.
+    await install({ configDir, settingsPath, chooseMode: async () => null, log: () => {} });
+    let cfg = parseTOML(fs.readFileSync(path.join(configDir, 'config.toml'), 'utf8'));
+    assert.equal(cfg.update?.auto_update, undefined, 'precondition: no explicit mode after first install');
+    // Reinstall in a TTY where the user now picks "all" → it must be written.
+    await install({ configDir, settingsPath, chooseMode: async () => 'all', log: () => {} });
+    cfg = parseTOML(fs.readFileSync(path.join(configDir, 'config.toml'), 'utf8'));
+    assert.equal(cfg.update?.auto_update, 'all', 'reinstall prompt wrote the chosen mode');
+  });
+
+  it('does NOT re-prompt on reinstall once an explicit mode exists', async () => {
+    fs.mkdirSync(configDir, { recursive: true });
+    fs.writeFileSync(path.join(configDir, 'config.toml'), '[update]\nauto_update = "patch"\n');
+    await install({
+      configDir,
+      settingsPath,
+      chooseMode: async () => { throw new Error('must not prompt once a mode is set'); },
+      log: () => {},
+    });
+    const cfg = parseTOML(fs.readFileSync(path.join(configDir, 'config.toml'), 'utf8'));
+    assert.equal(cfg.update?.auto_update, 'patch', 'existing explicit mode preserved');
+  });
+
+  it('reinstall with no TTY choice (null) leaves the commented default untouched', async () => {
+    await install({ configDir, settingsPath, chooseMode: async () => null, log: () => {} });
+    // Reinstall, still headless → no mode chosen, nothing written.
+    await install({ configDir, settingsPath, chooseMode: async () => null, log: () => {} });
+    const cfg = parseTOML(fs.readFileSync(path.join(configDir, 'config.toml'), 'utf8'));
+    assert.equal(cfg.update?.auto_update, undefined, 'still commented → falls back to patch');
   });
 });
