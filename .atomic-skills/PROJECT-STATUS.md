@@ -15,8 +15,8 @@ Canonical entry point. Auto-updated by `atomic-skills:project-status`. Read firs
 | npm-distribution | active | 2026-05-26 | — | Create package.json and bin/cli.js scaffold per spec architecture |
 | midsession-selfheal | active | 2026-06-01 | — | TDD: register heal on UserPromptSubmit for mid-session statusLine recovery |
 | auto-update | shipped | 2026-06-01 | — | DONE: PR #13 merged (43ce411), release v1.2.1 publicado no npm via OIDC (latest=1.2.1). Reinstall agora oferece escolha de auto-update |
-| locale-float-bug | active | 2026-06-02 | — | DONE (code+live deploy): `export LC_NUMERIC=C` fixes 7d/5h=0% under comma locale; +test/unit/test-locale-float.sh; suite 40+132 green. Uncommitted — decide commit + release |
-| native-daemon-selfheal | active | 2026-06-02 | feat/native-daemon-selfheal | VALIDATED Mac (launchd) + WSL (systemd .path, instant re-heal). Branch pushed (c7c449e). Next: merge PR + GH release v1.3.0 |
+| locale-float-bug | shipped | 2026-06-02 | — | SHIPPED in v1.3.1: `export LC_NUMERIC=C` fixes 7d/5h=0% under comma locale; +test/unit/test-locale-float.sh; released to npm via OIDC |
+| native-daemon-selfheal | shipped | 2026-06-02 | — | SHIPPED: PR #14 merged (c613d34), release v1.3.0 published to npm via OIDC (latest=1.3.0). Validated live on Mac (launchd) + WSL (systemd .path). |
 
 ## Recently Archived (last 10)
 

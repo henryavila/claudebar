@@ -1,6 +1,6 @@
 ---
 initiative_id: native-daemon-selfheal
-status: active
+status: shipped
 started: 2026-06-02
 last_updated: 2026-06-02T11:40:00Z
 branch: feat/native-daemon-selfheal

@@ -1,5 +1,11 @@
 # Changelog
 
+## v1.3.1 — 2026-06-02
+
+### Fix: 5h/7d chips render 0% under a comma-decimal locale
+
+Under a comma-decimal locale (`pt_BR`, `de_DE`, …) the `5h` and `7d` fuel gauges showed **0%** even when real usage was non-zero. Root cause: `statusline.sh` runs under macOS's bash 3.2, whose `printf '%.0f'` parses floats through `LC_NUMERIC`. With a comma as the decimal separator it rejects every period-decimal percentage `jq` emits (`23.5`, `4.7`, …) as an "invalid number" and falls back to 0. The fix sets `export LC_NUMERIC=C` near the top of the script — only `LC_NUMERIC`, so `LC_CTYPE` stays intact and UTF-8 powerline glyphs keep rendering. Covered by a new `test/unit/test-locale-float.sh` that probes for an installed comma-decimal locale, feeds fractional payloads, and asserts the rounded percent (skips cleanly when no such locale is available).
+
 ## v1.3.0 — 2026-06-02
 
 ### Native OS self-heal daemon — the bar survives even when the hooks are stripped
