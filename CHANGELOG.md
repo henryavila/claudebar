@@ -1,5 +1,21 @@
 # Changelog
 
+## v1.3.0 — 2026-06-02
+
+### Native OS self-heal daemon — the bar survives even when the hooks are stripped
+
+The statusline kept vanishing for good. Root cause: Claude Code re-persists `~/.claude/settings.json` from its in-memory snapshot on a TUI toggle, and that rewrite can drop **both** the `statusLine` block **and the heal hook entry itself**. The previous heal was 100% hook-driven, so once its own hook was gone, nothing ever ran it again — the bar stayed dead until a manual `update`.
+
+claudebar now registers a **native OS daemon** that runs the heal from *outside* Claude Code's control, so recovery no longer depends on any hook surviving:
+
+- **macOS** — a `launchd` LaunchAgent with `WatchPaths` on `settings.json` (re-heals within ~10s of any change; launchd enforces a ~10s minimum between job starts) plus a 5-minute `StartInterval` safety net.
+- **Linux / WSL with systemd** — `systemd --user` `.path` unit watching `settings.json` (+ a `.timer` safety net), running a one-shot `.service`.
+- **Older WSL / no systemd** — falls back to a `cron` entry, or a managed block in `~/.profile` that launches a poll loop.
+
+When it fires it restores **full parity** — `statusLine` + the heal hooks (SessionStart + UserPromptSubmit) + the auto-update hook — so even a total settings wipe comes back whole, and the zero-cost hook fast-path is re-seeded. The daemon pins the exact target file via `CLAUDEBAR_SETTINGS`, so it heals the right `settings.json` regardless of the supervisor's minimal environment.
+
+It's **on by default**. Opt out with `claudebar install --no-daemon` or `[daemon] enabled = false` in `config.toml`. `uninstall` deregisters it (every mechanism), `update` back-fills it onto existing installs, `doctor` reports its status, and you can manage it directly with **`claudebar daemon [install|uninstall|status|restart]`**. Registration is best-effort — a `launchctl`/`systemctl` hiccup is logged and never aborts an install.
+
 ## v1.2.1 — 2026-06-01
 
 ### Fix: installer offers the auto-update choice on reinstall

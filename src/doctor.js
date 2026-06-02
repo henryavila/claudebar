@@ -4,6 +4,7 @@ import os from 'node:os';
 import { execSync } from 'node:child_process';
 import { parseTOML } from './toml-parser.js';
 import { DEFAULT_MODE } from './auto-update.js';
+import { daemonStatus as defaultDaemonStatus } from './daemon.js';
 
 function check(name, fn) {
   try {
@@ -18,10 +19,11 @@ function run(cmd) {
   return execSync(cmd, { encoding: 'utf8', timeout: 5000 }).trim();
 }
 
-export async function doctor({ configDir, settingsPath, log } = {}) {
+export async function doctor({ configDir, settingsPath, log, daemonStatus } = {}) {
   configDir ??= path.join(os.homedir(), '.config', 'claudebar');
   settingsPath ??= path.join(os.homedir(), '.claude', 'settings.json');
   log ??= console.log;
+  daemonStatus ??= defaultDaemonStatus;
 
   const results = [];
 
@@ -115,6 +117,21 @@ export async function doctor({ configDir, settingsPath, log } = {}) {
       mode = parseTOML(fs.readFileSync(toml, 'utf8')).update?.auto_update ?? DEFAULT_MODE;
     }
     return `mode=${mode} (SessionStart → auto-update.mjs)`;
+  }));
+
+  results.push(check('daemon', () => {
+    // Honor the opt-out: a disabled daemon is not a failure (hook heal still runs).
+    let enabled = true;
+    const toml = path.join(configDir, 'config.toml');
+    if (fs.existsSync(toml)) {
+      try { enabled = parseTOML(fs.readFileSync(toml, 'utf8')).daemon?.enabled !== false; } catch { /* default on */ }
+    }
+    if (!enabled) return `disabled via [daemon] enabled=false (hook heal active)`;
+
+    const st = daemonStatus({ configDir, settingsPath });
+    if (st.mechanism === 'unsupported') return `${process.platform} not supported (hook heal active)`;
+    if (!st.registered) throw new Error(`not registered — run: npx @henryavila/claudebar update`);
+    return `${st.mechanism} ${st.active ? '(active)' : '(registered)'}`;
   }));
 
   results.push(check('version', () => {

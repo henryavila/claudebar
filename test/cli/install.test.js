@@ -3,12 +3,18 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
-import { install } from '../../src/install.js';
+import { install as rawInstall } from '../../src/install.js';
 import { parseTOML } from '../../src/toml-parser.js';
 
 const PKG_VERSION = JSON.parse(
   fs.readFileSync(new URL('../../package.json', import.meta.url), 'utf8')
 ).version;
+
+// All install tests run through this wrapper so the real OS daemon registration
+// (launchctl/systemctl, writes under ~/Library) never fires on the test machine.
+// `registerDaemon` defaults to a recording spy; a test can still override it.
+let daemonCalls;
+const install = (opts = {}) => rawInstall({ registerDaemon: (o) => daemonCalls.push(o), ...opts });
 
 function makeTmpDir() {
   return fs.mkdtempSync(path.join(os.tmpdir(), 'claudebar-install-test-'));
@@ -18,6 +24,7 @@ describe('install', () => {
   let tmpDir, configDir, claudeDir, settingsPath;
 
   beforeEach(() => {
+    daemonCalls = [];
     tmpDir = makeTmpDir();
     configDir = path.join(tmpDir, '.config', 'claudebar');
     claudeDir = path.join(tmpDir, '.claude');
@@ -177,5 +184,38 @@ describe('install', () => {
     await install({ configDir, settingsPath, chooseMode: async () => null, log: () => {} });
     const cfg = parseTOML(fs.readFileSync(path.join(configDir, 'config.toml'), 'utf8'));
     assert.equal(cfg.update?.auto_update, undefined, 'still commented → falls back to patch');
+  });
+
+  // --- OS daemon registration (default on, opt-out) ---
+  it('registers the OS daemon by default, passing the real config + settings paths', async () => {
+    await install({ configDir, settingsPath, log: () => {} });
+    assert.equal(daemonCalls.length, 1, 'daemon registered once');
+    assert.equal(daemonCalls[0].configDir, configDir);
+    assert.equal(daemonCalls[0].settingsPath, settingsPath);
+  });
+
+  it('skips daemon registration with --no-daemon (noDaemon: true)', async () => {
+    await install({ configDir, settingsPath, log: () => {}, noDaemon: true });
+    assert.equal(daemonCalls.length, 0, 'daemon NOT registered');
+  });
+
+  it('skips daemon registration when [daemon] enabled = false', async () => {
+    fs.mkdirSync(configDir, { recursive: true });
+    fs.writeFileSync(path.join(configDir, 'config.toml'), '[daemon]\nenabled = false\n');
+    await install({ configDir, settingsPath, log: () => {} });
+    assert.equal(daemonCalls.length, 0, 'config opt-out honored');
+  });
+
+  it('a daemon registration failure does not abort the install', async () => {
+    let reached = false;
+    await install({
+      configDir,
+      settingsPath,
+      log: () => {},
+      registerDaemon: () => { throw new Error('launchctl exploded'); },
+    });
+    // install completed past the daemon step and wrote the version file.
+    reached = fs.existsSync(path.join(configDir, '.version'));
+    assert.ok(reached, 'install finished despite daemon error');
   });
 });

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
-import { update } from '../../src/update.js';
+import { update as rawUpdate } from '../../src/update.js';
 
 const PKG_VERSION = JSON.parse(
   fs.readFileSync(new URL('../../package.json', import.meta.url), 'utf8')
@@ -13,10 +13,17 @@ function makeTmpDir() {
   return fs.mkdtempSync(path.join(os.tmpdir(), 'claudebar-update-test-'));
 }
 
+// Wrapper so the real OS daemon back-fill never runs on the test machine.
+// `registerDaemon` defaults to a recording spy that reports a registered launchd.
+let daemonCalls;
+const update = (opts = {}) =>
+  rawUpdate({ registerDaemon: (o) => { daemonCalls.push(o); return { mechanism: 'launchd', registered: true }; }, ...opts });
+
 describe('update', () => {
   let tmpDir, configDir, claudeDir, settingsPath;
 
   beforeEach(() => {
+    daemonCalls = [];
     tmpDir = makeTmpDir();
     configDir = path.join(tmpDir, '.config', 'claudebar');
     fs.mkdirSync(configDir, { recursive: true });
@@ -107,5 +114,21 @@ describe('update', () => {
     await update({ configDir, settingsPath, log: () => {} });
     const settings = JSON.parse(fs.readFileSync(settingsPath, 'utf8'));
     assert.equal(settings.statusLine.command, '/my/own.sh');
+  });
+
+  // The daemon back-fill is the migration path: an install predating the feature
+  // gains the hook-independent backstop on the next update, even when up to date.
+  it('back-fills the OS daemon on update (even when up to date)', async () => {
+    fs.writeFileSync(path.join(configDir, '.version'), PKG_VERSION);
+    await update({ configDir, settingsPath, log: () => {} });
+    assert.equal(daemonCalls.length, 1, 'daemon registered once');
+    assert.equal(daemonCalls[0].configDir, configDir);
+  });
+
+  it('honors the [daemon] enabled = false opt-out on update', async () => {
+    fs.writeFileSync(path.join(configDir, '.version'), PKG_VERSION);
+    fs.writeFileSync(path.join(configDir, 'config.toml'), '[daemon]\nenabled = false\n');
+    await update({ configDir, settingsPath, log: () => {} });
+    assert.equal(daemonCalls.length, 0, 'daemon skipped when disabled');
   });
 });

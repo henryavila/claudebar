@@ -6,6 +6,7 @@ import { parseTOML } from './toml-parser.js';
 import { compileConfig } from './config-compiler.js';
 import { migrateConfig, parseSchemaVersion, CURRENT_SCHEMA_VERSION } from './config-migrator.js';
 import { readSettings, writeSettingsAtomic, ensureStatusLine, ensureHealHook, ensureAutoUpdateHook } from './settings.js';
+import { installDaemon } from './daemon.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ASSETS_DIR = path.join(__dirname, '..', 'assets');
@@ -21,10 +22,11 @@ function timestamp() {
   return `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}-${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}`;
 }
 
-export async function update({ configDir, settingsPath, log } = {}) {
+export async function update({ configDir, settingsPath, log, registerDaemon } = {}) {
   configDir ??= path.join(os.homedir(), '.config', 'claudebar');
   settingsPath ??= path.join(os.homedir(), '.claude', 'settings.json');
   log ??= console.log;
+  registerDaemon ??= installDaemon;
 
   const versionFile = path.join(configDir, '.version');
   if (!fs.existsSync(versionFile)) {
@@ -54,6 +56,28 @@ export async function update({ configDir, settingsPath, log } = {}) {
       if (slRestored) log(`Restored statusLine in settings.json`);
       if (hookAdded) log(`Registered self-heal hooks (SessionStart + UserPromptSubmit)`);
       if (autoAdded) log(`Registered auto-update hook (SessionStart)`);
+    }
+  }
+
+  // Back-fill the OS daemon on EVERY update (before the version gate) so installs
+  // predating the feature gain the hook-independent backstop, and an existing one
+  // gets a refreshed node path + templates. Respects the `[daemon] enabled = false`
+  // opt-out. Best-effort — registerDaemon never throws.
+  let daemonEnabled = true;
+  const configTomlForDaemon = path.join(configDir, 'config.toml');
+  if (fs.existsSync(configTomlForDaemon)) {
+    try {
+      daemonEnabled = parseTOML(fs.readFileSync(configTomlForDaemon, 'utf8')).daemon?.enabled !== false;
+    } catch {
+      /* unparseable config → leave the default (enabled) */
+    }
+  }
+  if (daemonEnabled) {
+    try {
+      const res = registerDaemon({ configDir, settingsPath, log });
+      if (res?.registered) log(`Refreshed self-heal daemon (${res.mechanism})`);
+    } catch (e) {
+      log(`Daemon: refresh failed (${e.message}) — hook heal still active`);
     }
   }
 

@@ -2,7 +2,7 @@
 initiative_id: midsession-selfheal
 status: active
 started: 2026-06-01
-last_updated: 2026-06-01T09:24:05Z
+last_updated: 2026-06-02T11:09:50Z
 branch:
 worktree:
 plan_link:
@@ -21,7 +21,8 @@ tasks: {}
 
 parked: []
 
-emerged: []
+emerged:
+  - {title: "ensure-statusline.mjs upgraded to full parity (now also restores auto-update hook) via shared healAll(); driven by native-daemon-selfheal", surfaced_at: 2026-06-02T11:09:50Z, promoted: false}
 
 next_action: "Implemented + live-validated. Commit; consider release (version bump) so npm users get mid-session recovery."
 ---

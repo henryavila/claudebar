@@ -1,7 +1,8 @@
-const VALID_SECTIONS = ['layout', 'chips', 'thresholds', 'colors', 'glyphs', 'update'];
+const VALID_SECTIONS = ['layout', 'chips', 'thresholds', 'colors', 'glyphs', 'update', 'daemon'];
 
 const VALID_KEYS = {
   update: ['auto_update', 'auto_update_interval_hours'],
+  daemon: ['enabled'],
   layout: ['force', 'refresh_interval'],
   chips: ['model', 'effort', 'tmux', 'repo', 'branch', 'worktree', 'dirty', 'pr', 'agent', 'ctx_bar', 'five_hour_bar', 'seven_day_bar', 'countdown', 'time_marker', 'update'],
   thresholds: ['warning', 'critical'],
@@ -30,7 +31,7 @@ export function parseTOML(content) {
       let val = kvMatch[2].trim();
       val = val.replace(/^["']|["']$/g, '');
 
-      if (section === 'chips') {
+      if (section === 'chips' || section === 'daemon') {
         config[section][key] = val === 'true';
       } else if (section === 'colors' || section === 'thresholds') {
         const num = Number(val);
@@ -75,9 +76,9 @@ export function validateConfig(config) {
         }
       }
 
-      if (section === 'chips') {
+      if (section === 'chips' || section === 'daemon') {
         if (typeof val !== 'boolean') {
-          errors.push({ message: `[chips] ${key} = ${val} — must be true or false` });
+          errors.push({ message: `[${section}] ${key} = ${val} — must be true or false` });
         }
       }
 
