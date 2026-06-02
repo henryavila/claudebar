@@ -3,11 +3,16 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
-import { doctor } from '../../src/doctor.js';
+import { doctor as rawDoctor } from '../../src/doctor.js';
 
 function makeTmpDir() {
   return fs.mkdtempSync(path.join(os.tmpdir(), 'claudebar-doctor-test-'));
 }
+
+// Default the daemon-status probe to a registered launchd so the existing checks
+// don't hit the real OS (launchctl) or the real ~/Library. Tests can override.
+const okDaemon = () => ({ mechanism: 'launchd', registered: true, active: true });
+const doctor = (opts = {}) => rawDoctor({ daemonStatus: okDaemon, ...opts });
 
 describe('doctor', () => {
   let tmpDir, configDir, claudeDir, settingsPath;
@@ -71,5 +76,36 @@ describe('doctor', () => {
     const { results } = await doctor({ configDir, settingsPath, log: () => {} });
     const check = results.find(r => r.name === 'auto-update');
     assert.equal(check.pass, false);
+  });
+
+  it('daemon check passes and reports the mechanism when registered', async () => {
+    fs.writeFileSync(settingsPath, '{}');
+    const { results } = await doctor({ configDir, settingsPath, log: () => {} });
+    const check = results.find(r => r.name === 'daemon');
+    assert.ok(check, 'daemon check present');
+    assert.equal(check.pass, true);
+    assert.ok(check.message.includes('launchd'));
+  });
+
+  it('daemon check fails when the supervisor is not registered', async () => {
+    fs.writeFileSync(settingsPath, '{}');
+    const { results } = await doctor({
+      configDir, settingsPath, log: () => {},
+      daemonStatus: () => ({ mechanism: 'systemd', registered: false, active: false }),
+    });
+    const check = results.find(r => r.name === 'daemon');
+    assert.equal(check.pass, false);
+  });
+
+  it('daemon check passes (not a failure) when opted out via config', async () => {
+    fs.writeFileSync(path.join(configDir, 'config.toml'), '[daemon]\nenabled = false\n');
+    fs.writeFileSync(settingsPath, '{}');
+    const { results } = await doctor({
+      configDir, settingsPath, log: () => {},
+      daemonStatus: () => ({ mechanism: 'launchd', registered: false, active: false }),
+    });
+    const check = results.find(r => r.name === 'daemon');
+    assert.equal(check.pass, true, 'opt-out is not a failure');
+    assert.ok(check.message.includes('disabled'));
   });
 });

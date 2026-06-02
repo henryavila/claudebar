@@ -59,7 +59,8 @@ This:
 2. Generates a fully documented `config.toml` with all defaults (commented out).
 3. Backs up `~/.claude/settings.json` with a timestamp.
 4. Patches `settings.json` to point at the installed script.
-5. Runs diagnostic checks to confirm everything works.
+5. Registers the self-heal hooks **and a native OS self-heal daemon** (see [How it works](#how-it-works)). Add `--no-daemon` to skip the daemon.
+6. Runs diagnostic checks to confirm everything works.
 
 Send any message in Claude Code (or restart it) — the new statusline renders.
 
@@ -83,7 +84,7 @@ Defaults to JetBrainsMono. Pass `--font FiraCode` (or any name from [nerd-fonts 
 npx @henryavila/claudebar doctor
 ```
 
-Checks bash, jq, git, 256-color, installed files, settings.json, and version — reports pass/fail for each.
+Checks bash, jq, git, 256-color, installed files, settings.json, the self-heal/auto-update hooks, the **OS self-heal daemon**, and version — reports pass/fail for each.
 
 ## Configuration
 
@@ -134,7 +135,7 @@ Replaces the statusline script and toml-parser with the latest version. Your `co
 npx @henryavila/claudebar uninstall
 ```
 
-Backs up `settings.json`, removes the `statusLine` block, and deletes `~/.config/claudebar/`.
+Backs up `settings.json`, removes the `statusLine` block and hooks, **deregisters the OS self-heal daemon** (launchd/systemd/cron/profile), and deletes `~/.config/claudebar/`.
 
 ## How it works
 
@@ -145,6 +146,15 @@ Claude Code pipes a [JSON object](https://code.claude.com/docs/en/statusline#ava
 3. If `config.toml` exists, auto-recompiles `config.sh` when the TOML is newer (adds <1ms overhead per render).
 4. Composes two rows: `identity_row` (top) and `fuel_row` (bottom), with each chip checking its `CHIP_*` toggle and owning its preceding separator so absences don't leave orphan glyphs.
 5. Prints ANSI-colored text to stdout. Claude Code displays it below the prompt.
+
+### Self-healing
+
+Claude Code can re-persist `~/.claude/settings.json` from its in-memory snapshot (e.g. on a TUI toggle), dropping the `statusLine` block — and sometimes the heal hook entry itself. claudebar recovers on two layers:
+
+- **Hooks (fast path)** — a silent `SessionStart` + `UserPromptSubmit` hook restores `statusLine` and re-registers itself, bringing the bar back within one prompt.
+- **OS daemon (backstop)** — because a rewrite can drop the hook entry too (after which nothing hook-driven ever runs again), a native supervisor re-injects everything from *outside* Claude Code: `launchd` (macOS), `systemd --user` (Linux/WSL), or a `cron`/`~/.profile` poll fallback. It watches `settings.json` and restores **full parity** (statusLine + both heal hooks + the auto-update hook).
+
+Manage the daemon directly with `claudebar daemon [install|uninstall|status|restart]`. Opt out with `claudebar install --no-daemon` or `[daemon] enabled = false` in `config.toml`.
 
 See [`DESIGN.md`](DESIGN.md) for the full spec and [`CHANGELOG.md`](CHANGELOG.md) for version history.
 

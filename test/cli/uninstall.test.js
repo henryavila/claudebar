@@ -3,16 +3,22 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
-import { uninstall } from '../../src/uninstall.js';
+import { uninstall as rawUninstall } from '../../src/uninstall.js';
 
 function makeTmpDir() {
   return fs.mkdtempSync(path.join(os.tmpdir(), 'claudebar-uninstall-test-'));
 }
 
+// Wrapper so the real OS daemon deregistration (launchctl/systemctl) never runs
+// on the test machine. `deregisterDaemon` defaults to a recording spy.
+let daemonCalls;
+const uninstall = (opts = {}) => rawUninstall({ deregisterDaemon: (o) => daemonCalls.push(o), ...opts });
+
 describe('uninstall', () => {
   let tmpDir, configDir, claudeDir, settingsPath;
 
   beforeEach(() => {
+    daemonCalls = [];
     tmpDir = makeTmpDir();
     configDir = path.join(tmpDir, '.config', 'claudebar');
     claudeDir = path.join(tmpDir, '.claude');
@@ -83,5 +89,16 @@ describe('uninstall', () => {
     });
     const backups = fs.readdirSync(claudeDir).filter(f => f.startsWith('settings.json.bak-'));
     assert.ok(backups.length >= 1);
+  });
+
+  it('deregisters the OS daemon before removing configDir', async () => {
+    await uninstall({ configDir, settingsPath, confirm: async () => true, log: () => {} });
+    assert.equal(daemonCalls.length, 1, 'daemon deregistered once');
+    assert.equal(daemonCalls[0].configDir, configDir);
+  });
+
+  it('does NOT deregister the daemon when the user declines', async () => {
+    await uninstall({ configDir, settingsPath, confirm: async () => false, log: () => {} });
+    assert.equal(daemonCalls.length, 0, 'no changes on abort');
   });
 });

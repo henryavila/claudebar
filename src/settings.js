@@ -134,6 +134,21 @@ export function ensureAutoUpdateHook(settings) {
   return { changed };
 }
 
+// Full self-heal in one call: restore the statusLine block AND re-register both
+// the heal hook and the auto-update hook. This is the single source of truth for
+// "make settings.json whole again" — used by the hook payload
+// (assets/ensure-statusline.mjs) and the OS daemon, so a clobber that strips
+// EVERYTHING (statusLine + all hooks) is fully recovered from one entry point.
+// Each ensure* is restore-if-missing and idempotent, so this never churns the
+// file when nothing is gone. Mutates `settings` in place. Returns changed:true if
+// ANY of the three restored something.
+export function healAll(settings) {
+  const sl = ensureStatusLine(settings);
+  const heal = ensureHealHook(settings);
+  const auto = ensureAutoUpdateHook(settings);
+  return { changed: sl.changed || heal.changed || auto.changed };
+}
+
 // Remove the auto-update hook (used by `uninstall`). Drops our entries and prunes
 // matcher objects left empty, leaving the heal hook and any foreign hooks intact.
 export function removeAutoUpdateHook(settings) {

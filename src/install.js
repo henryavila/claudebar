@@ -7,6 +7,7 @@ import { parseTOML } from './toml-parser.js';
 import { compileConfig } from './config-compiler.js';
 import { setStatusLine, ensureHealHook, ensureAutoUpdateHook } from './settings.js';
 import { setModeInToml } from './auto-update.js';
+import { installDaemon } from './daemon.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ASSETS_DIR = path.join(__dirname, '..', 'assets');
@@ -74,11 +75,13 @@ function timestamp() {
   return `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}-${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}`;
 }
 
-export async function install({ configDir, settingsPath, chooseMode, log } = {}) {
+export async function install({ configDir, settingsPath, chooseMode, log, noDaemon, registerDaemon } = {}) {
   configDir ??= path.join(os.homedir(), '.config', 'claudebar');
   settingsPath ??= path.join(os.homedir(), '.claude', 'settings.json');
   chooseMode ??= promptAutoUpdateMode;
   log ??= console.log;
+  noDaemon ??= false;
+  registerDaemon ??= installDaemon;
 
   fs.mkdirSync(configDir, { recursive: true });
 
@@ -153,9 +156,23 @@ export async function install({ configDir, settingsPath, chooseMode, log } = {})
     log(`settings.json not found at ${settingsPath} — skipped patching`);
   }
 
+  // OS daemon: the hook-independent backstop. Default on; opt out with
+  // `--no-daemon` or `[daemon] enabled = false`. Best-effort — registerDaemon
+  // never throws, so a launchctl/systemctl hiccup can't fail the install.
+  const daemonEnabled = parsed.daemon?.enabled !== false && !noDaemon;
+  if (daemonEnabled) {
+    try {
+      registerDaemon({ configDir, settingsPath, log });
+    } catch (e) {
+      log(`Daemon: registration failed (${e.message}) — hook heal still active`);
+    }
+  } else {
+    log(`Daemon: disabled (${noDaemon ? '--no-daemon' : '[daemon] enabled = false'}) — hook heal only`);
+  }
+
   log(`\nInstall complete. Restart Claude Code or send a message to see the statusline.`);
 }
 
-export default async function main(args) {
-  await install();
+export default async function main(args = []) {
+  await install({ noDaemon: args.includes('--no-daemon') });
 }

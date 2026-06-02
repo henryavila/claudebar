@@ -74,3 +74,11 @@
 #   "off"   — never check or update
 # auto_update = "patch"
 # auto_update_interval_hours = 24
+
+[daemon]
+# Hook-independent OS self-heal backstop (launchd on macOS, systemd --user on
+# Linux/WSL, cron/profile fallback). It re-injects the statusLine + hooks even
+# when Claude Code rewrites settings.json and drops the heal hook entirely.
+# Default: on. Set to false to opt out — `uninstall` removes any registered
+# daemon, and `install --no-daemon` skips registering it.
+# enabled = true

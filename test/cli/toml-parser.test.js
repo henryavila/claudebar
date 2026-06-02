@@ -56,6 +56,13 @@ describe('parseTOML', () => {
     assert.equal(config.update.auto_update_interval_hours, 24);
     assert.equal(typeof config.update.auto_update_interval_hours, 'number');
   });
+
+  it('parses [daemon] enabled as a real boolean (not the string "false")', () => {
+    assert.equal(parseTOML('[daemon]\nenabled = false').daemon.enabled, false);
+    assert.equal(parseTOML('[daemon]\nenabled = true').daemon.enabled, true);
+    // a header with only commented keys → empty section → opt-out check sees undefined (= on)
+    assert.deepEqual(parseTOML('[daemon]\n# enabled = true').daemon, {});
+  });
 });
 
 describe('validateConfig', () => {
@@ -107,5 +114,11 @@ describe('validateConfig', () => {
     assert.equal(validateConfig({ update: { auto_update_interval_hours: 0 } }).valid, false);
     assert.equal(validateConfig({ update: { auto_update_interval_hours: -1 } }).valid, false);
     assert.equal(validateConfig({ update: { auto_update_interval_hours: 1.5 } }).valid, false);
+  });
+
+  it('accepts a boolean [daemon] enabled and rejects a non-boolean', () => {
+    assert.equal(validateConfig({ daemon: { enabled: true } }).valid, true);
+    assert.equal(validateConfig({ daemon: { enabled: false } }).valid, true);
+    assert.equal(validateConfig({ daemon: { enabled: 'yes' } }).valid, false);
   });
 });

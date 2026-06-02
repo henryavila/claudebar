@@ -9,6 +9,7 @@ const commands = {
   config:         () => import('../src/config.js'),
   doctor:         () => import('../src/doctor.js'),
   uninstall:      () => import('../src/uninstall.js'),
+  daemon:         () => import('../src/daemon-command.js'),
   'install-font': () => import('../src/install-font.js'),
 };
 
@@ -20,11 +21,14 @@ Usage: claudebar <command>
 
 Commands:
   install        Install statusline to ~/.config/claudebar/
+                   install --no-daemon  skip the OS self-heal daemon
   update         Update to latest version (preserves config)
   config         Edit config.toml in $EDITOR
                    config auto-update [patch|all|off]  set/show auto-update mode
   doctor         Diagnose installation
   uninstall      Remove statusline
+  daemon         Manage the OS self-heal daemon
+                   daemon [install|uninstall|status|restart]
   install-font   Install a Nerd Font
 
 Options:

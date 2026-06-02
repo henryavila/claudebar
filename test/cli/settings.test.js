@@ -8,6 +8,7 @@ import {
   removeHealHook,
   ensureAutoUpdateHook,
   removeAutoUpdateHook,
+  healAll,
   STATUSLINE_COMMAND,
 } from '../../src/settings.js';
 
@@ -231,6 +232,47 @@ describe('settings.ensureAutoUpdateHook', () => {
     const cmds = sessionStartCommands(s);
     assert.ok(cmds.some((c) => c.includes('x.sh')), 'foreign hook kept');
     assert.ok(cmds.some((c) => c.includes('auto-update')), 'auto-update added');
+  });
+});
+
+// healAll is the single "make settings whole" entry point shared by the hook
+// payload and the OS daemon. It must restore statusLine + heal hook (both events)
+// + auto-update hook from a total wipe, and stay a true no-op when nothing's gone.
+describe('settings.healAll (full-parity restore)', () => {
+  function commands(s, event) {
+    return (s.hooks?.[event] ?? []).flatMap((e) => (e.hooks ?? []).map((h) => h.command));
+  }
+
+  it('restores statusLine + heal hooks + auto-update hook from an empty settings', () => {
+    const s = {};
+    const { changed } = healAll(s);
+    assert.equal(changed, true);
+    assert.equal(s.statusLine.command, STATUSLINE_COMMAND);
+    assert.ok(commands(s, 'SessionStart').some((c) => c.includes('ensure-statusline')), 'heal on SessionStart');
+    assert.ok(commands(s, 'UserPromptSubmit').some((c) => c.includes('ensure-statusline')), 'heal on UserPromptSubmit');
+    assert.ok(commands(s, 'SessionStart').some((c) => c.includes('auto-update')), 'auto-update on SessionStart');
+  });
+
+  it('is a true no-op when statusLine and all hooks are already present', () => {
+    const s = {};
+    healAll(s);
+    const { changed } = healAll(s);
+    assert.equal(changed, false, 'second run must not churn the file');
+  });
+
+  it('reports changed when only the auto-update hook is missing', () => {
+    const s = {};
+    ensureStatusLine(s);
+    ensureHealHook(s);
+    const { changed } = healAll(s);
+    assert.equal(changed, true, 'a partial gap still counts as a heal');
+    assert.ok(commands(s, 'SessionStart').some((c) => c.includes('auto-update')), 'auto-update back-filled');
+  });
+
+  it('does not clobber a statusLine the user pointed elsewhere', () => {
+    const s = { statusLine: { type: 'command', command: '/my/own.sh' } };
+    healAll(s);
+    assert.equal(s.statusLine.command, '/my/own.sh');
   });
 });
 

@@ -118,6 +118,19 @@ describe('ensure-statusline.mjs (self-heal hook)', () => {
     assert.ok(cmds.some((c) => c.includes('version-check.sh')), 'foreign hook preserved');
   });
 
+  // Full parity — the deployed heal payload (also run by the OS daemon) must
+  // restore the auto-update hook too, not just statusLine + heal hook. A clobber
+  // that strips every hook should come back whole from one heal run.
+  it('restores the auto-update hook as well (full parity via healAll)', () => {
+    fs.writeFileSync(settingsPath, JSON.stringify({ hooks: {} }, null, 2));
+    runHeal(installDir, settingsPath);
+    const settings = JSON.parse(fs.readFileSync(settingsPath, 'utf8'));
+    const cmds = sessionStartCommands(settings);
+    assert.ok(settings.statusLine?.command.includes('claudebar'), 'statusLine restored');
+    assert.ok(cmds.some((c) => c.includes('ensure-statusline')), 'heal hook restored');
+    assert.ok(cmds.some((c) => c.includes('auto-update')), 'auto-update hook restored');
+  });
+
   // Edge — only the heal hook was dropped (statusLine still points somewhere
   // the user chose). Heal must re-add its hook without clobbering statusLine.
   it('re-registers its hook without touching a present statusLine', () => {
