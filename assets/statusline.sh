@@ -2,6 +2,13 @@
 # Claude Code statusline — see DESIGN.md
 set -uo pipefail
 
+# Force a C decimal separator (period). macOS bash 3.2's `printf '%.0f'` parses
+# floats through LC_NUMERIC; under a comma-decimal locale (pt_BR, de_DE, …) it
+# rejects the period-decimal percentages jq emits ("invalid number") and falls
+# back to 0 — so a real 23% five_hour/seven_day rendered as 0%. Set only
+# LC_NUMERIC (not LC_ALL) so LC_CTYPE stays intact and UTF-8 glyphs keep working.
+export LC_NUMERIC=C
+
 # ─── Dependency probe ─────────────────────────────────────────────────
 have() { command -v "$1" >/dev/null 2>&1; }
 
