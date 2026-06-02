@@ -330,12 +330,44 @@ describe('daemon install/uninstall/status', () => {
     assert.ok(!fs.existsSync(path.join(home, '.config', 'claudebar', 'daemon-poll.sh')), 'poll script removed');
   });
 
+  // ---- systemd → cron → profile fallback (WSL hang resilience) ----
+  it('falls back to cron and cleans up units when systemd --user fails', () => {
+    const run = makeRun((cmd) => { if (cmd === 'systemctl') { const e = new Error('ETIMEDOUT'); throw e; } return ''; });
+    const res = installDaemon({ home, run, log: () => {}, platformInfo: { platform: 'linux', hasSystemd: true, hasCron: true } });
+    assert.equal(res.mechanism, 'cron');
+    assert.equal(res.registered, true);
+    const dir = path.join(home, '.config', 'systemd', 'user');
+    assert.ok(!fs.existsSync(path.join(dir, `${SYSTEMD_UNIT}.path`)), 'half-written systemd units cleaned up');
+    assert.ok(run.getCrontab().includes(CRON_MARKER), 'cron entry written as the fallback');
+  });
+
+  it('falls back to profile when systemd fails and cron is unavailable', () => {
+    // bespoke run: systemctl hangs, crontab binary missing (ENOENT)
+    const run = (cmd) => {
+      if (cmd === 'systemctl') throw new Error('ETIMEDOUT');
+      if (cmd === 'crontab') { const e = new Error('not found'); e.code = 'ENOENT'; throw e; }
+      return '';
+    };
+    const res = installDaemon({ home, run, log: () => {}, platformInfo: { platform: 'linux', hasSystemd: true, hasCron: false } });
+    assert.equal(res.mechanism, 'profile');
+    assert.equal(res.registered, true);
+    assert.ok(fs.existsSync(path.join(home, '.config', 'claudebar', 'daemon-poll.sh')), 'poll script written as last resort');
+  });
+
+  it('daemonStatus reports the ACTUALLY-installed mechanism (cron) even though detection would say systemd', () => {
+    const run = makeRun((cmd) => { if (cmd === 'systemctl') throw new Error('ETIMEDOUT'); return ''; });
+    installDaemon({ home, run, log: () => {}, platformInfo: { platform: 'linux', hasSystemd: true, hasCron: true } });
+    // ask status with the SAME (systemd-claiming) platform — it must still see cron
+    const st = daemonStatus({ home, run, platformInfo: { platform: 'linux', hasSystemd: true, hasCron: true } });
+    assert.equal(st.mechanism, 'cron');
+    assert.equal(st.registered, true);
+  });
+
   // ---- best-effort guarantee ----
-  it('installDaemon never throws — a failing OS command returns registered:false', () => {
-    const run = makeRun((cmd) => { if (cmd === 'systemctl') throw new Error('no user bus'); return ''; });
-    const res = installDaemon({ home, run, log: () => {}, platformInfo: { platform: 'linux', hasSystemd: true } });
+  it('installDaemon never throws — an unsupported platform returns registered:false', () => {
+    const res = installDaemon({ home, run: makeRun(), log: () => {}, platformInfo: { platform: 'aix' } });
     assert.equal(res.registered, false);
-    assert.ok(res.error, 'error captured, not thrown');
+    assert.equal(res.mechanism, 'unsupported');
   });
 
   it('uninstallDaemon is a silent no-op when nothing was installed', () => {

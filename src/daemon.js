@@ -92,16 +92,22 @@ export function isWSL() {
   }
 }
 
-// True only when systemd is the init system AND a user bus is reachable (so
-// `systemctl --user` will actually work). Both checks matter: containers/old WSL
-// may have the binary but no running user instance.
+// True only when systemd is the init system AND its user manager actually answers
+// quickly. Both matter: containers / WSL may have systemd as init but a user
+// instance that hangs (a known WSL issue), in which case `systemctl --user`
+// commands block until they time out. We probe with a SHORT timeout and treat
+// only a prompt response (any exit code — e.g. "degraded") as reachable; a
+// timeout/kill/ENOENT means "not usable" so we never choose systemd just to hang
+// on it. (installDaemon ALSO falls back if a later systemctl call fails, covering
+// a manager that answers the probe but then stalls on `enable`.)
 export function hasSystemdUser(run = defaultRun) {
+  if (!fs.existsSync('/run/systemd/system')) return false;
   try {
-    if (!fs.existsSync('/run/systemd/system')) return false;
-    run('systemctl', ['--user', 'show-environment']);
+    run('systemctl', ['--user', 'is-system-running'], { timeout: 4000 });
     return true;
-  } catch {
-    return false;
+  } catch (e) {
+    if (e && typeof e.status === 'number') return true; // answered (non-zero state is fine)
+    return false; // ETIMEDOUT / killed / ENOENT → user bus not usable
   }
 }
 
@@ -343,7 +349,20 @@ export function installDaemon(opts = {}) {
 
   try {
     if (mechanism === 'launchd') return installLaunchd(p, run, log);
-    if (mechanism === 'systemd') return installSystemd(p, run, log);
+    if (mechanism === 'systemd') {
+      // systemd is the nicest mechanism, but its --user manager can be flaky
+      // (notably on WSL: `enable` hangs → ETIMEDOUT). If it fails, clean up the
+      // half-written units and fall back to a mechanism that actually works,
+      // so the user always ends up with a functioning backstop.
+      try {
+        return installSystemd(p, run, log);
+      } catch (error) {
+        cleanupSystemdUnits(p);
+        log(`Daemon: systemd --user unavailable (${error.message}); falling back`);
+        if (hasCron(run)) return installCron(p, run, log);
+        return installProfile(p, run, log);
+      }
+    }
     if (mechanism === 'cron') return installCron(p, run, log);
     if (mechanism === 'profile') return installProfile(p, run, log);
     log(`Daemon: ${platformInfo.platform} not supported — skipped (hook heal still active)`);
@@ -351,6 +370,13 @@ export function installDaemon(opts = {}) {
   } catch (error) {
     log(`Daemon: registration failed (${error.message}) — hook heal still active`);
     return { mechanism, registered: false, error };
+  }
+}
+
+function cleanupSystemdUnits(p) {
+  const units = systemdUnitPaths(p);
+  for (const u of Object.values(units)) {
+    try { fs.rmSync(u, { force: true }); } catch { /* best-effort */ }
   }
 }
 
@@ -384,8 +410,10 @@ function installSystemd(p, run, log) {
   fs.writeFileSync(units.service, systemdService({ nodePath: p.nodePath, scriptPath: p.scriptPath, settingsPath: p.settingsPath }));
   fs.writeFileSync(units.path, systemdPath({ unit: SYSTEMD_UNIT, settingsPath: p.settingsPath }));
   fs.writeFileSync(units.timer, systemdTimer({ unit: SYSTEMD_UNIT, interval: SAFETY_INTERVAL_SECONDS }));
-  run('systemctl', ['--user', 'daemon-reload']);
-  run('systemctl', ['--user', 'enable', '--now', `${SYSTEMD_UNIT}.path`, `${SYSTEMD_UNIT}.timer`]);
+  // Give the user manager room to respond (WSL can be slow); a true hang still
+  // hits the timeout and triggers the cron/profile fallback in installDaemon.
+  run('systemctl', ['--user', 'daemon-reload'], { timeout: 12000 });
+  run('systemctl', ['--user', 'enable', '--now', `${SYSTEMD_UNIT}.path`, `${SYSTEMD_UNIT}.timer`], { timeout: 12000 });
   log(`Daemon: registered systemd --user units (.path watch + .timer net)`);
   return { mechanism: 'systemd', registered: true, detail: p.systemdUserDir };
 }
@@ -477,40 +505,42 @@ export function uninstallDaemon(opts = {}) {
 
 // --- status (for doctor / CLI) ----------------------------------------------
 
-// Best-effort report. `registered` = our supervisor artifact exists on disk /
-// in the shared file. `active` = the OS confirms it's loaded/enabled (falls back
-// to `registered` when the query can't run).
+// Best-effort report. Detects the mechanism that is ACTUALLY installed by probing
+// each artifact in turn — not the one detection would pick — so a systemd→cron
+// fallback (or an environment that changed since install) reports the truth.
+// `active` = the OS confirms it's loaded/enabled; falls back to `registered` when
+// the query can't run. When nothing is installed, reports the would-be mechanism
+// with registered:false.
 export function daemonStatus(opts = {}) {
   const run = opts.run ?? defaultRun;
   const p = resolvePaths(opts);
-  const platformInfo = opts.platformInfo ?? detectPlatformInfo(run);
-  const mechanism = chooseMechanism(platformInfo);
 
-  if (mechanism === 'launchd') {
-    const plist = plistPathFor(p);
-    const registered = fs.existsSync(plist);
-    const active = registered && tryRun(run, 'launchctl', ['print', `gui/${uid()}/${LABEL}`]).ok;
-    return { mechanism, registered, active, detail: plist };
+  const plist = plistPathFor(p);
+  if (fs.existsSync(plist)) {
+    const active = tryRun(run, 'launchctl', ['print', `gui/${uid()}/${LABEL}`]).ok;
+    return { mechanism: 'launchd', registered: true, active, detail: plist };
   }
-  if (mechanism === 'systemd') {
-    const units = systemdUnitPaths(p);
-    const registered = fs.existsSync(units.path);
-    const active = registered && (tryRun(run, 'systemctl', ['--user', 'is-active', `${SYSTEMD_UNIT}.path`]).out ?? '').trim() === 'active';
-    return { mechanism, registered, active, detail: p.systemdUserDir };
+
+  const units = systemdUnitPaths(p);
+  if (fs.existsSync(units.path)) {
+    const active = (tryRun(run, 'systemctl', ['--user', 'is-active', `${SYSTEMD_UNIT}.path`], { timeout: 4000 }).out ?? '').trim() === 'active';
+    return { mechanism: 'systemd', registered: true, active, detail: p.systemdUserDir };
   }
-  if (mechanism === 'cron') {
-    const cron = tryRun(run, 'crontab', ['-l']);
-    const registered = cron.ok && typeof cron.out === 'string' && cron.out.includes(CRON_MARKER);
-    return { mechanism, registered, active: registered, detail: 'crontab' };
+
+  const cron = tryRun(run, 'crontab', ['-l']);
+  if (cron.ok && typeof cron.out === 'string' && cron.out.includes(CRON_MARKER)) {
+    return { mechanism: 'cron', registered: true, active: true, detail: 'crontab' };
   }
-  if (mechanism === 'profile') {
-    const registered = fs.existsSync(p.profilePath) && fs.readFileSync(p.profilePath, 'utf8').includes(PROFILE_MARKER_START);
+
+  if (fs.existsSync(p.profilePath) && fs.readFileSync(p.profilePath, 'utf8').includes(PROFILE_MARKER_START)) {
     let active = false;
     if (fs.existsSync(p.pidFile)) {
       const pid = Number(fs.readFileSync(p.pidFile, 'utf8').trim());
       active = Number.isInteger(pid) && pid > 0 && silently(() => process.kill(pid, 0));
     }
-    return { mechanism, registered, active, detail: p.profilePath };
+    return { mechanism: 'profile', registered: true, active, detail: p.profilePath };
   }
-  return { mechanism, registered: false, active: false, detail: 'unsupported platform' };
+
+  const platformInfo = opts.platformInfo ?? detectPlatformInfo(run);
+  return { mechanism: chooseMechanism(platformInfo), registered: false, active: false, detail: 'not registered' };
 }
