@@ -3,7 +3,7 @@ initiative_id: native-daemon-selfheal
 status: active
 started: 2026-06-02
 last_updated: 2026-06-02T11:40:00Z
-branch:
+branch: feat/native-daemon-selfheal
 worktree:
 plan_link: /Users/henry/.claude/plans/optimized-bubbling-crayon.md
 wip_limit: 2
@@ -28,7 +28,7 @@ parked: []
 
 emerged: []
 
-next_action: "DONE (code + live launchd verify): src/daemon.js + lifecycle/doctor/CLI integration; [daemon] config flag; full parity heal; CLAUDEBAR_SETTINGS pinned. Suite 185 CLI + 40 bash green. Uncommitted — decide commit + release (v1.3.0) + live deploy (claudebar update)"
+next_action: "VALIDATED on Mac (launchd active) AND WSL (systemd .path+.timer active; clobber re-healed instantly — bar never blinked). WSL fix (c7c449e): 12s systemctl timeout + cron/profile fallback + artifact-based status. Branch feat/native-daemon-selfheal pushed. Next: merge PR + GH release v1.3.0 (npm via OIDC)"
 ---
 
 # Native daemon self-heal — keep the bar alive when Claude Code strips the hooks
@@ -63,6 +63,24 @@ OS-level backstop. `uninstall` deregisters the daemon.
   `ensure-statusline.mjs` to call it; daemon runs that same script. No 2nd payload.
 - Pin `process.execPath` into the supervisor at install/update time.
 - Daemon registration is best-effort — failure logs, never aborts install.
+
+## Outcome (validated 2026-06-02)
+
+End-to-end validated on both target platforms:
+- **macOS** — `launchd` LaunchAgent (WatchPaths on settings.json + StartInterval).
+  Isolated live test + real deploy (`update` → v1.3.0): RunAtLoad heals instantly,
+  WatchPaths re-heals after a clobber (~10s; launchd's min relaunch interval),
+  full parity restored, `doctor` ✓, clean `uninstall`.
+- **WSL** — `systemd --user` `.path` + `.service` (oneshot) + `.timer`. First
+  attempt hit `systemctl --user enable` ETIMEDOUT (5s too short for WSL's slow
+  user manager) → fixed with a 12s timeout + a systemd→cron→profile fallback +
+  artifact-based status. Re-test: units active/waiting, clobber re-healed so fast
+  the bar never visibly blanked, full parity restored.
+
+Key robustness decision (c7c449e): never trust a single systemd probe — if any
+`systemctl --user` call fails/hangs, clean up the half-written units and fall back
+to cron → ~/.profile poll, and report the mechanism actually installed (not the
+guessed one).
 
 ## Links
 
