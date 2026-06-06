@@ -1,8 +1,8 @@
 ---
 initiative_id: native-daemon-selfheal
-status: active
+status: shipped
 started: 2026-06-02
-last_updated: 2026-06-06T21:24:53Z
+last_updated: 2026-06-06T21:44:09Z
 branch: feat/native-daemon-selfheal
 worktree:
 plan_link: /Users/henry/.claude/plans/optimized-bubbling-crayon.md
@@ -28,7 +28,7 @@ parked: []
 
 emerged: []
 
-next_action: "Frames 2+3 RESOLVED. (2) fullscreen write-fight gate; (3) StartLimitIntervalSec=0 so the .path watch survives write bursts. Validated live: daemon fired 8x during a real tui:fullscreen+statusLine state and left it untouched; .path survived an 8-write burst. Suite 198 CLI/40 bash green. UNCOMMITTED — next: commit + PR + v1.3.2 release to npm via OIDC."
+next_action: "SHIPPED v1.3.2: PR #16 merged (f9b3760), GH release v1.3.2 → publish.yml green → npm latest=1.3.2. CI passed on macOS + Ubuntu (confirms the launchd review). Frames 2 (fullscreen write-fight gate) + 3 (StartLimitIntervalSec=0) both resolved + validated live on WSL."
 ---
 
 # Native daemon self-heal — keep the bar alive when Claude Code strips the hooks

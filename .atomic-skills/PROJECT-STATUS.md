@@ -16,7 +16,7 @@ Canonical entry point. Auto-updated by `atomic-skills:project-status`. Read firs
 | midsession-selfheal | active | 2026-06-01 | — | TDD: register heal on UserPromptSubmit for mid-session statusLine recovery |
 | auto-update | shipped | 2026-06-01 | — | DONE: PR #13 merged (43ce411), release v1.2.1 publicado no npm via OIDC (latest=1.2.1). Reinstall agora oferece escolha de auto-update |
 | locale-float-bug | shipped | 2026-06-02 | — | SHIPPED in v1.3.1: `export LC_NUMERIC=C` fixes 7d/5h=0% under comma locale; +test/unit/test-locale-float.sh; released to npm via OIDC |
-| native-daemon-selfheal | active | 2026-06-02 | — | 2 regressions FIXED: (a) daemon vs fullscreen-TUI write-fight → healAll daemon-mode gate (skip while tui===fullscreen / hook alive) + CLAUDEBAR_DAEMON=1; (b) .path latched 'failed' on write bursts → StartLimitIntervalSec=0. Validated live + 198/40 tests green. UNCOMMITTED. Next: commit + PR + v1.3.2. |
+| native-daemon-selfheal | shipped | 2026-06-02 | — | SHIPPED v1.3.2 (npm latest): fixed daemon vs fullscreen-TUI write-fight (healAll daemon-mode gate + CLAUDEBAR_DAEMON=1) + .path start-limit fragility (StartLimitIntervalSec=0). PR #16 merged; CI green on macOS + Ubuntu. |
 
 ## Recently Archived (last 10)
 
