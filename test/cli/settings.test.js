@@ -276,6 +276,72 @@ describe('settings.healAll (full-parity restore)', () => {
   });
 });
 
+// Daemon mode — the OS daemon fires on EVERY settings.json write (launchd
+// WatchPaths / systemd .path), including the transient one Claude Code makes when
+// it enters a fullscreen TUI and drops statusLine. Healing instantly there starts
+// a write-fight (daemon restores → CC re-drops → …) that flickers the TUI and trips
+// systemd's start-limit, killing the daemon. So the daemon-path heal acts ONLY on a
+// genuine catastrophic clobber: skip while CC is in a fullscreen TUI, and skip while
+// the heal hook still lives (the hook recovers statusLine at the next turn). The
+// hook path (daemon:false) keeps its unconditional mid-session restore.
+describe('settings.healAll (daemon mode — catastrophic-clobber-only gate)', () => {
+  function commands(s, event) {
+    return (s.hooks?.[event] ?? []).flatMap((e) => (e.hooks ?? []).map((h) => h.command));
+  }
+
+  it('skips entirely while Claude Code is in a fullscreen TUI', () => {
+    // tui:fullscreen present, statusLine dropped, but hooks intact — the exact
+    // transient state. Daemon must NOT write (no fight with the fullscreen TUI).
+    const s = { tui: 'fullscreen' };
+    ensureHealHook(s);
+    const { changed } = healAll(s, { daemon: true });
+    assert.equal(changed, false, 'daemon stays out of an active fullscreen toggle');
+    assert.equal(s.statusLine, undefined, 'statusLine left dropped — CC restores it on exit');
+  });
+
+  it('skips restoring statusLine when the heal hook is still alive', () => {
+    // statusLine dropped, no fullscreen marker, but the hook survives → the
+    // UserPromptSubmit/SessionStart hook will recover statusLine at the next turn.
+    const s = {};
+    ensureHealHook(s);
+    const { changed } = healAll(s, { daemon: true });
+    assert.equal(changed, false, 'daemon defers to the live hook heal');
+    assert.equal(s.statusLine, undefined);
+  });
+
+  it('heals fully on a catastrophic clobber (hooks gone, not fullscreen)', () => {
+    // The case the daemon exists for: statusLine AND all hooks wiped, and CC is
+    // NOT in a fullscreen TUI — nothing else can recover. Restore everything.
+    const s = { hooks: {} };
+    const { changed } = healAll(s, { daemon: true });
+    assert.equal(changed, true);
+    assert.equal(s.statusLine.command, STATUSLINE_COMMAND);
+    assert.ok(commands(s, 'SessionStart').some((c) => c.includes('ensure-statusline')), 'heal hook restored');
+    assert.ok(commands(s, 'UserPromptSubmit').some((c) => c.includes('ensure-statusline')), 'mid-session hook restored');
+    assert.ok(commands(s, 'SessionStart').some((c) => c.includes('auto-update')), 'auto-update restored');
+  });
+
+  it('does NOT heal a hook-less clobber while still in fullscreen (waits for exit)', () => {
+    // Even a full wipe is left alone while tui:fullscreen — acting now still
+    // fights the TUI. The next daemon trigger after CC exits fullscreen (tui key
+    // gone) finds hooks still missing and heals then.
+    const s = { tui: 'fullscreen', hooks: {} };
+    const { changed } = healAll(s, { daemon: true });
+    assert.equal(changed, false);
+    assert.equal(s.statusLine, undefined);
+  });
+
+  it('hook path (daemon:false) still restores statusLine regardless of tui state', () => {
+    // The hook only ever fires outside fullscreen, but the default mode must keep
+    // its unconditional restore so mid-session recovery is unaffected by this gate.
+    const s = { tui: 'fullscreen' };
+    ensureHealHook(s);
+    const { changed } = healAll(s);
+    assert.equal(changed, true);
+    assert.equal(s.statusLine.command, STATUSLINE_COMMAND);
+  });
+});
+
 describe('settings.removeAutoUpdateHook', () => {
   function sessionStartCommands(s) {
     return (s.hooks?.SessionStart ?? []).flatMap((e) => (e.hooks ?? []).map((h) => h.command));

@@ -33,7 +33,12 @@ try {
     process.env.CLAUDEBAR_SETTINGS || path.join(os.homedir(), '.claude', 'settings.json');
   const settings = readSettings(settingsPath);
   if (settings) {
-    const { changed } = healAll(settings);
+    // CLAUDEBAR_DAEMON=1 is set only by the OS supervisor (launchd/systemd/cron/
+    // poll). It selects the conservative, catastrophic-clobber-only heal so the
+    // daemon never write-fights Claude Code's transient fullscreen-TUI statusLine
+    // drop. The hook path leaves it unset → full unconditional heal.
+    const daemon = Boolean(process.env.CLAUDEBAR_DAEMON);
+    const { changed } = healAll(settings, { daemon });
     if (changed) writeSettingsAtomic(settingsPath, settings);
   }
 } catch {

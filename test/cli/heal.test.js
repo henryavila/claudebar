@@ -19,9 +19,11 @@ function makeInstallDir() {
   return dir;
 }
 
-function runHeal(installDir, settingsPath) {
+function runHeal(installDir, settingsPath, { daemon = false } = {}) {
+  const env = { ...process.env, CLAUDEBAR_SETTINGS: settingsPath };
+  if (daemon) env.CLAUDEBAR_DAEMON = '1';
   return execFileSync('node', [path.join(installDir, 'ensure-statusline.mjs')], {
-    env: { ...process.env, CLAUDEBAR_SETTINGS: settingsPath },
+    env,
     encoding: 'utf8',
   });
 }
@@ -169,6 +171,56 @@ describe('ensure-statusline.mjs (self-heal hook)', () => {
     assert.ok(settings.statusLine?.command.includes('claudebar'), 'statusLine restored');
     const healCount = sessionStartCommands(settings).filter((c) => c.includes('ensure-statusline')).length;
     assert.equal(healCount, 1, 'heal hook not duplicated');
+  });
+
+  // Daemon mode (CLAUDEBAR_DAEMON=1) — the OS daemon runs this same script on
+  // every settings.json write. It must NOT restore statusLine during a transient
+  // fullscreen-TUI drop (would write-fight the TUI), and must defer to a live hook
+  // heal; it acts only on a genuine hook-less clobber.
+  it('daemon run leaves a fullscreen-TUI statusLine drop alone (no fight)', () => {
+    // tui:fullscreen + statusLine dropped, hooks intact — must not write.
+    fs.writeFileSync(
+      settingsPath,
+      JSON.stringify(
+        {
+          tui: 'fullscreen',
+          hooks: {
+            SessionStart: [{ matcher: '*', hooks: [{ type: 'command', command: 'node ~/.config/claudebar/ensure-statusline.mjs' }] }],
+          },
+        },
+        null,
+        2
+      )
+    );
+    const before = fs.readFileSync(settingsPath, 'utf8');
+    const mtimeBefore = fs.statSync(settingsPath).mtimeMs;
+    runHeal(installDir, settingsPath, { daemon: true });
+    assert.equal(fs.readFileSync(settingsPath, 'utf8'), before, 'daemon must not touch a fullscreen toggle');
+    assert.equal(fs.statSync(settingsPath).mtimeMs, mtimeBefore, 'file not rewritten');
+  });
+
+  it('daemon run defers to a live heal hook (does not restore statusLine itself)', () => {
+    fs.writeFileSync(
+      settingsPath,
+      JSON.stringify(
+        { hooks: { SessionStart: [{ matcher: '*', hooks: [{ type: 'command', command: 'node ~/.config/claudebar/ensure-statusline.mjs' }] }] } },
+        null,
+        2
+      )
+    );
+    runHeal(installDir, settingsPath, { daemon: true });
+    const settings = JSON.parse(fs.readFileSync(settingsPath, 'utf8'));
+    assert.equal(settings.statusLine, undefined, 'hook heal will recover statusLine at next turn');
+  });
+
+  it('daemon run heals a catastrophic clobber (hooks gone, not fullscreen)', () => {
+    fs.writeFileSync(settingsPath, JSON.stringify({ hooks: {} }, null, 2));
+    runHeal(installDir, settingsPath, { daemon: true });
+    const settings = JSON.parse(fs.readFileSync(settingsPath, 'utf8'));
+    assert.ok(settings.statusLine?.command.includes('claudebar'), 'statusLine restored');
+    const cmds = sessionStartCommands(settings);
+    assert.ok(cmds.some((c) => c.includes('ensure-statusline')), 'heal hook restored');
+    assert.ok(cmds.some((c) => c.includes('auto-update')), 'auto-update restored');
   });
 
   // Idempotency — when both statusLine and the hook are already correct, a heal

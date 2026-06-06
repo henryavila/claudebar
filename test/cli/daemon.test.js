@@ -90,6 +90,18 @@ describe('daemon template generators', () => {
     assert.ok(svc.includes('ExecStart=/opt/node/bin/node /home/u/.config/claudebar/ensure-statusline.mjs'));
   });
 
+  // The .path watch fires the service on EVERY settings.json write. A burst of
+  // writes (≥5 in systemd's default 10s window) tripped the start-limit and
+  // latched the .path unit permanently 'failed' — the watcher died forever and
+  // needed a manual reset-failed (the exact "bar dead permanently" failure this
+  // initiative exists to prevent). The service is now a loop-safe idempotent
+  // oneshot (the daemon-mode gate can't self-fight), so disabling the start-limit
+  // is safe and keeps the watcher alive through any burst.
+  it('systemdService disables the start-limit so a write burst never kills the watch', () => {
+    const svc = systemdService(opts);
+    assert.ok(svc.includes('StartLimitIntervalSec=0'), 'start-limit disabled on the unit');
+  });
+
   it('systemdPath watches settings.json and points at the service', () => {
     const unit = systemdPath(opts);
     assert.ok(unit.includes('PathModified=/home/u/.claude/settings.json'));
@@ -107,7 +119,7 @@ describe('daemon template generators', () => {
   it('cronEntry carries the marker and a quoted minute-poll command with pinned settings', () => {
     const entry = cronEntry(opts);
     assert.ok(entry.includes(CRON_MARKER));
-    assert.ok(entry.includes('* * * * * CLAUDEBAR_SETTINGS="/home/u/.claude/settings.json" "/opt/node/bin/node" "/home/u/.config/claudebar/ensure-statusline.mjs"'));
+    assert.ok(entry.includes('* * * * * CLAUDEBAR_DAEMON=1 CLAUDEBAR_SETTINGS="/home/u/.claude/settings.json" "/opt/node/bin/node" "/home/u/.config/claudebar/ensure-statusline.mjs"'));
   });
 
   it('profileBlock launches the poll script and is marker-delimited', () => {
@@ -124,6 +136,18 @@ describe('daemon template generators', () => {
     assert.ok(sh.includes('export CLAUDEBAR_SETTINGS="/home/u/.claude/settings.json"'));
     assert.ok(sh.includes('"/opt/node/bin/node" "/home/u/.config/claudebar/ensure-statusline.mjs"'));
     assert.ok(sh.includes('sleep 60'));
+  });
+
+  // The daemon fires on every settings.json write, including CC's transient
+  // fullscreen-TUI drop. Each supervisor invocation must set CLAUDEBAR_DAEMON=1 so
+  // the heal payload takes its conservative, catastrophic-clobber-only path (skip
+  // while tui:fullscreen or while the hook heal still lives) — otherwise the daemon
+  // write-fights the fullscreen TUI and trips systemd's start-limit.
+  it('every supervisor template marks the run as daemon (CLAUDEBAR_DAEMON=1)', () => {
+    assert.match(launchdPlist(opts), /CLAUDEBAR_DAEMON[\s\S]*<string>1<\/string>/, 'launchd plist env');
+    assert.ok(systemdService(opts).includes('Environment=CLAUDEBAR_DAEMON=1'), 'systemd service env');
+    assert.ok(cronEntry(opts).includes('CLAUDEBAR_DAEMON=1'), 'cron entry env');
+    assert.ok(pollScript({ ...opts, interval: 60 }).includes('CLAUDEBAR_DAEMON'), 'poll script export');
   });
 });
 

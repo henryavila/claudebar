@@ -134,6 +134,33 @@ export function ensureAutoUpdateHook(settings) {
   return { changed };
 }
 
+// True while Claude Code is in a fullscreen TUI. CC stamps settings.json with
+// `"tui": "fullscreen"` exactly while a fullscreen overlay is open, and during
+// that state it re-persists settings WITHOUT the statusLine block. That drop is
+// transient — CC restores it when the overlay closes — so it must NOT be treated
+// as a clobber to heal.
+function isFullscreenTui(settings) {
+  return settings?.tui === 'fullscreen';
+}
+
+// True when OUR heal hook is still registered under any event. When it is, the
+// hook-driven heal is alive and will recover a dropped statusLine at the next
+// turn (SessionStart / UserPromptSubmit) — safely debounced to a turn boundary,
+// after any fullscreen overlay has closed. The daemon defers to it in that case.
+function healHookPresent(settings) {
+  const events = settings?.hooks;
+  if (!events || typeof events !== 'object') return false;
+  for (const list of Object.values(events)) {
+    if (!Array.isArray(list)) continue;
+    for (const entry of list) {
+      for (const h of entry?.hooks ?? []) {
+        if (typeof h?.command === 'string' && h.command.includes(HEAL_HOOK_MARKER)) return true;
+      }
+    }
+  }
+  return false;
+}
+
 // Full self-heal in one call: restore the statusLine block AND re-register both
 // the heal hook and the auto-update hook. This is the single source of truth for
 // "make settings.json whole again" — used by the hook payload
@@ -142,7 +169,20 @@ export function ensureAutoUpdateHook(settings) {
 // Each ensure* is restore-if-missing and idempotent, so this never churns the
 // file when nothing is gone. Mutates `settings` in place. Returns changed:true if
 // ANY of the three restored something.
-export function healAll(settings) {
+//
+// `opts.daemon` switches to the conservative path the OS daemon needs. The daemon
+// fires on EVERY settings.json write — including CC's transient fullscreen-TUI
+// drop — so an unconditional heal there starts a write-fight (daemon restores →
+// CC re-drops while still fullscreen → …) that flickers the TUI and trips
+// systemd's start-limit, killing the daemon. In daemon mode we therefore act ONLY
+// on a genuine catastrophic clobber: skip while CC is in a fullscreen TUI, and
+// skip while the heal hook still lives (it recovers statusLine at the next turn).
+// The hook path (daemon:false, the default) keeps its unconditional restore so
+// mid-session recovery is unaffected.
+export function healAll(settings, { daemon = false } = {}) {
+  if (daemon && (isFullscreenTui(settings) || healHookPresent(settings))) {
+    return { changed: false };
+  }
   const sl = ensureStatusLine(settings);
   const heal = ensureHealHook(settings);
   const auto = ensureAutoUpdateHook(settings);

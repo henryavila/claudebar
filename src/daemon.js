@@ -184,6 +184,8 @@ export function launchdPlist({ label, nodePath, scriptPath, settingsPath, logPat
 	<dict>
 		<key>CLAUDEBAR_SETTINGS</key>
 		<string>${xmlEscape(settingsPath)}</string>
+		<key>CLAUDEBAR_DAEMON</key>
+		<string>1</string>
 	</dict>
 </dict>
 </plist>
@@ -193,10 +195,18 @@ export function launchdPlist({ label, nodePath, scriptPath, settingsPath, logPat
 export function systemdService({ nodePath, scriptPath, settingsPath }) {
   return `[Unit]
 Description=claudebar statusline self-heal (one-shot)
+# The .path watch fires this on EVERY settings.json write. Claude Code can emit a
+# burst (≥5 in systemd's default 10s window) that would trip the start-limit and
+# latch the .path unit permanently 'failed' — killing the watcher for good. The
+# service is a loop-safe idempotent oneshot (the daemon-mode heal gate skips while
+# tui:fullscreen / when the hook still lives, so it can't self-fight), so disabling
+# the limit is safe and keeps the watch alive through any burst.
+StartLimitIntervalSec=0
 
 [Service]
 Type=oneshot
 Environment=CLAUDEBAR_SETTINGS=${settingsPath}
+Environment=CLAUDEBAR_DAEMON=1
 ExecStart=${nodePath} ${scriptPath}
 `;
 }
@@ -232,7 +242,7 @@ WantedBy=timers.target
 // paths survive spaces; CLAUDEBAR_SETTINGS pins the exact target file (cron runs
 // with a minimal env); output discarded (the heal is silent).
 export function cronEntry({ nodePath, scriptPath, settingsPath }) {
-  return `${CRON_MARKER}\n* * * * * CLAUDEBAR_SETTINGS="${settingsPath}" "${nodePath}" "${scriptPath}" >/dev/null 2>&1`;
+  return `${CRON_MARKER}\n* * * * * CLAUDEBAR_DAEMON=1 CLAUDEBAR_SETTINGS="${settingsPath}" "${nodePath}" "${scriptPath}" >/dev/null 2>&1`;
 }
 
 export function profileBlock({ pollScriptPath }) {
@@ -252,6 +262,7 @@ fi
 echo $$ > "$PIDFILE"
 trap 'rm -f "$PIDFILE"' EXIT
 export CLAUDEBAR_SETTINGS="${settingsPath}"
+export CLAUDEBAR_DAEMON=1
 while true; do
   "${nodePath}" "${scriptPath}" >/dev/null 2>&1 || true
   sleep ${interval}
