@@ -1,5 +1,19 @@
 # Changelog
 
+## v1.3.3 — 2026-06-07
+
+### Mobile/compact 5h & 7d chips now show the time-elapsed marker (the │)
+
+The time-elapsed marker — the dim `│` that shows where you *should* be in a rate-limit window, so you can see at a glance whether you're burning faster than the window allows (pipe inside the fill) or have margin (pipe past the fill edge) — only rendered on the **desktop** layout. The **mobile/compact** `5h` and `7d` chips drew a bare 5-pip bar with no marker.
+
+The compact bars now render the same cue: `pip_bar_compact` takes an optional marker argument (scaled to its 5-pip width), and `compact_row3` accepts `five_hour_resets_at` / `seven_day_resets_at`, computes the elapsed-window slot exactly like the full `fuel_row`, and passes it through. The compact layout shows the **marker only** (no countdown text — there's no room), keeping mobile in parity with the desktop signal. Covered by new marker assertions in `test/unit/test-pip-bar-compact.sh` and `test/unit/test-compact-rows.sh`.
+
+## v1.3.2 — 2026-06-02
+
+### Fix: the self-heal daemon stops fighting Claude Code's fullscreen TUI
+
+The native self-heal daemon (v1.3.0) could write `settings.json` while Claude Code held its fullscreen TUI open, racing the editor's own re-persist and causing flicker / lost edits. The daemon's `healAll` now gates on a daemon-mode flag (`CLAUDEBAR_DAEMON=1`) so the watch-triggered heal no longer fights the live TUI, and the systemd `.path` unit's start-limit fragility is fixed with `StartLimitIntervalSec=0`. PR #16; CI green on macOS + Ubuntu.
+
 ## v1.3.1 — 2026-06-02
 
 ### Fix: 5h/7d chips render 0% under a comma-decimal locale

@@ -101,5 +101,38 @@ else
     echo "  FAIL: compact_row3 ctx-only"; fail=1
 fi
 
+# ── Time-elapsed marker (the │) in the compact 5h/7d chips ──
+# A positive *_resets_at drives the marker, just like the full fuel_row.
+export CLAUDEBAR_NOW_FOR_TESTING=1000000
+five_reset=$(( 1000000 + WINDOW_5H_SECONDS * 20 / 100 ))   # 80% elapsed → slot 4/5
+seven_reset=$(( 1000000 + WINDOW_7D_SECONDS * 50 / 100 ))  # 50% elapsed → slot 2/5
+
+out=$(compact_row3 ctx=42 five_hour=30 seven_day=65 \
+        five_hour_resets_at="$five_reset" seven_day_resets_at="$seven_reset")
+pipes=$(printf '%s' "$out" | grep -o '│' | wc -l)
+if (( pipes == 2 )); then
+    echo "  ok: compact_row3 renders marker on both 5h + 7d (2 │)"
+else
+    echo "  FAIL: compact_row3 expected 2 │ got $pipes"; fail=1
+fi
+
+# No resets_at → no marker (parity with prior behavior)
+out=$(compact_row3 ctx=42 five_hour=30 seven_day=65)
+if [[ "$out" != *"│"* ]]; then
+    echo "  ok: compact_row3 omits marker without resets_at"
+else
+    echo "  FAIL: compact_row3 drew a marker without resets_at"; fail=1
+fi
+
+# Zero / non-numeric resets_at → no marker (defensive)
+out=$(compact_row3 ctx=42 five_hour=30 seven_day=65 \
+        five_hour_resets_at=0 seven_day_resets_at="")
+if [[ "$out" != *"│"* ]]; then
+    echo "  ok: compact_row3 ignores zero/empty resets_at"
+else
+    echo "  FAIL: compact_row3 drew a marker for zero/empty resets_at"; fail=1
+fi
+unset CLAUDEBAR_NOW_FOR_TESTING
+
 if (( fail == 0 )); then echo "PASS: compact rows"; exit 0
 else echo "FAIL: compact rows"; exit 1; fi
