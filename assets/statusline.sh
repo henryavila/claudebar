@@ -405,7 +405,10 @@ compact_row3() {
     fi
 
     if [[ -n "$five_hour" ]] && (( CHIP_FIVE_HOUR_BAR )); then
-        printf '  '
+        # Single-space inter-chip gap (vs 2 in the full layout): the marker's
+        # │ widens each rate chip by one cell, and at narrow mobile widths the
+        # 2-space gap pushed the trailing 7d % off-screen (truncated to "3…").
+        printf ' '
         fg "$C_REPO" "5h"; printf ' '
         local marker_5h=""
         if (( CHIP_TIME_MARKER )) && [[ "$five_hour_resets_at" =~ ^[0-9]+$ ]] && (( five_hour_resets_at > 0 )); then
@@ -423,7 +426,7 @@ compact_row3() {
     fi
 
     if [[ -n "$seven_day" ]] && (( CHIP_SEVEN_DAY_BAR )); then
-        printf '  '
+        printf ' '
         fg "$C_REPO" "7d"; printf ' '
         local marker_7d=""
         if (( CHIP_TIME_MARKER )) && [[ "$seven_day_resets_at" =~ ^[0-9]+$ ]] && (( seven_day_resets_at > 0 )); then

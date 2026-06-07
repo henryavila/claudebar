@@ -1,5 +1,13 @@
 # Changelog
 
+## v1.3.4 — 2026-06-07
+
+### Fix: the 7d percentage no longer gets truncated on narrow mobile widths
+
+v1.3.3 added the time-elapsed marker (the `│`) to the compact `5h` and `7d` chips, but the inserted marker widens each rate chip by one cell. On a narrow mobile terminal that pushed the trailing `7d` percentage past the edge, so it rendered cut off (e.g. `37%` → `3…`).
+
+`compact_row3` now uses a **single-space** inter-chip gap (the full/desktop layout keeps its 2-space gap), reclaiming exactly the two cells the `5h` + `7d` markers add. The compact fuel row is back to the same width it was before v1.3.3, so the percentage fits — while keeping the inserted-pipe marker (true parity with desktop) and the accurate 5-pip gauge. Locked by a new `26-compact-markers` fixture (markers active, two-digit `7d %`) that asserts the full row renders.
+
 ## v1.3.3 — 2026-06-07
 
 ### Mobile/compact 5h & 7d chips now show the time-elapsed marker (the │)
