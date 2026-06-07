@@ -239,21 +239,43 @@ pip_bar() {
     fi
 }
 
-# ─── pip_bar_compact PCT — 5-pip zone-colored bar (compact layout) ────
+# ─── pip_bar_compact PCT [MARKER_POS] — 5-pip zone-colored bar (compact) ─
+# Mirrors pip_bar's time-elapsed marker, scaled to the 5-pip width: a dim │
+# is inserted at MARKER_POS in [0..5] (0 = before pip 0, N = between pip N-1
+# and pip N, 5 = after pip 4). Empty/unset marker preserves the legacy
+# 5-char render. Lets the mobile/compact 5h/7d chips show the same "are you
+# burning faster than the window allows" cue as the full layout.
 pip_bar_compact() {
     local pct=$1
+    local marker=${2:-}
     local color filled i
     color=$(zone_color "$pct")
     filled=$(( pct * 5 / 100 ))
     (( filled > 5 )) && filled=5
     (( filled < 0 )) && filled=0
+
+    # Normalize / clamp marker to [0, 5] when numeric; treat anything else
+    # (empty, non-digit) as "no marker".
+    local marker_active=0
+    if [[ "$marker" =~ ^-?[0-9]+$ ]]; then
+        marker_active=1
+        (( marker < 0 )) && marker=0
+        (( marker > 5 )) && marker=5
+    fi
+
     for ((i=0; i<5; i++)); do
+        if (( marker_active && marker == i )); then
+            fg "$C_REPO" "│"
+        fi
         if (( i < filled )); then
             fg "$color" "▰"
         else
             fg "$C_BAR_DIM" "▱"
         fi
     done
+    if (( marker_active && marker == 5 )); then
+        fg "$C_REPO" "│"
+    fi
 }
 
 # ─── compact_row1 — session row (model + effort/agent + PR) ──────────
@@ -354,15 +376,23 @@ compact_row2() {
 }
 
 # ─── compact_row3 — fuel gauges with 5-pip bars ──────────────────────
-# Usage: compact_row3 ctx=X five_hour=X seven_day=X
+# Usage: compact_row3 ctx=X five_hour=X seven_day=X \
+#                     five_hour_resets_at=X seven_day_resets_at=X
+# Like fuel_row, a positive *_resets_at timestamp drives the time-elapsed
+# marker (the │) on the 5h/7d chips. The compact layout has no room for the
+# countdown text, so it renders the marker only — keeping mobile in parity
+# with the desktop "are you burning faster than the window allows" cue.
 compact_row3() {
     local ctx="" five_hour="" seven_day=""
+    local five_hour_resets_at="" seven_day_resets_at=""
     local arg
     for arg in "$@"; do
         case "$arg" in
-            ctx=*)        ctx=${arg#ctx=} ;;
-            five_hour=*)  five_hour=${arg#five_hour=} ;;
-            seven_day=*)  seven_day=${arg#seven_day=} ;;
+            ctx=*)                  ctx=${arg#ctx=} ;;
+            five_hour=*)            five_hour=${arg#five_hour=} ;;
+            seven_day=*)            seven_day=${arg#seven_day=} ;;
+            five_hour_resets_at=*)  five_hour_resets_at=${arg#five_hour_resets_at=} ;;
+            seven_day_resets_at=*)  seven_day_resets_at=${arg#seven_day_resets_at=} ;;
         esac
     done
 
@@ -377,7 +407,17 @@ compact_row3() {
     if [[ -n "$five_hour" ]] && (( CHIP_FIVE_HOUR_BAR )); then
         printf '  '
         fg "$C_REPO" "5h"; printf ' '
-        pip_bar_compact "$five_hour"
+        local marker_5h=""
+        if (( CHIP_TIME_MARKER )) && [[ "$five_hour_resets_at" =~ ^[0-9]+$ ]] && (( five_hour_resets_at > 0 )); then
+            local now_5h remaining_5h elapsed_5h
+            now_5h=$(now_epoch)
+            remaining_5h=$(( five_hour_resets_at - now_5h ))
+            elapsed_5h=$(( WINDOW_5H_SECONDS - remaining_5h ))
+            (( elapsed_5h < 0 )) && elapsed_5h=0
+            (( elapsed_5h > WINDOW_5H_SECONDS )) && elapsed_5h=WINDOW_5H_SECONDS
+            marker_5h=$(( elapsed_5h * 5 / WINDOW_5H_SECONDS ))
+        fi
+        pip_bar_compact "$five_hour" "$marker_5h"
         printf ' '
         fg "$(zone_color "$five_hour")" "$(printf '%2d%%' "$five_hour")"
     fi
@@ -385,7 +425,17 @@ compact_row3() {
     if [[ -n "$seven_day" ]] && (( CHIP_SEVEN_DAY_BAR )); then
         printf '  '
         fg "$C_REPO" "7d"; printf ' '
-        pip_bar_compact "$seven_day"
+        local marker_7d=""
+        if (( CHIP_TIME_MARKER )) && [[ "$seven_day_resets_at" =~ ^[0-9]+$ ]] && (( seven_day_resets_at > 0 )); then
+            local now_7d remaining_7d elapsed_7d
+            now_7d=$(now_epoch)
+            remaining_7d=$(( seven_day_resets_at - now_7d ))
+            elapsed_7d=$(( WINDOW_7D_SECONDS - remaining_7d ))
+            (( elapsed_7d < 0 )) && elapsed_7d=0
+            (( elapsed_7d > WINDOW_7D_SECONDS )) && elapsed_7d=WINDOW_7D_SECONDS
+            marker_7d=$(( elapsed_7d * 5 / WINDOW_7D_SECONDS ))
+        fi
+        pip_bar_compact "$seven_day" "$marker_7d"
         printf ' '
         fg "$(zone_color "$seven_day")" "$(printf '%2d%%' "$seven_day")"
     fi
@@ -792,7 +842,9 @@ main() {
         compact_row3 \
             ctx="$CTX" \
             five_hour="$FIVE_HOUR" \
-            seven_day="$SEVEN_DAY"
+            seven_day="$SEVEN_DAY" \
+            five_hour_resets_at="$FIVE_HOUR_RESETS_AT" \
+            seven_day_resets_at="$SEVEN_DAY_RESETS_AT"
     else
         identity_row \
             model="$MODEL" \
