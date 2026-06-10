@@ -223,6 +223,69 @@ describe('ensure-statusline.mjs (self-heal hook)', () => {
     assert.ok(cmds.some((c) => c.includes('auto-update')), 'auto-update restored');
   });
 
+  // Hook path during fullscreen (CLAUDEBAR_DAEMON unset) — CC's fullscreen TUI is
+  // a persistent, user-chosen rendering mode (CC 2.1.89+) that has no inline
+  // statusLine; while active CC re-persists settings WITHOUT the statusLine block.
+  // The per-turn UserPromptSubmit heal must NOT restore it then, or CC hot-reloads
+  // the statusLine and drops out of fullscreen once per prompt. Fullscreen gates
+  // BOTH paths — not just the daemon.
+  it('hook run leaves a fullscreen-TUI statusLine drop alone (no per-turn fight)', () => {
+    // tui:fullscreen + statusLine dropped, heal hook intact — hook path must not write.
+    fs.writeFileSync(
+      settingsPath,
+      JSON.stringify(
+        {
+          tui: 'fullscreen',
+          hooks: {
+            SessionStart: [{ matcher: '*', hooks: [{ type: 'command', command: 'node ~/.config/claudebar/ensure-statusline.mjs' }] }],
+          },
+        },
+        null,
+        2
+      )
+    );
+    const before = fs.readFileSync(settingsPath, 'utf8');
+    const mtimeBefore = fs.statSync(settingsPath).mtimeMs;
+    runHeal(installDir, settingsPath); // daemon:false (hook path)
+    assert.equal(fs.readFileSync(settingsPath, 'utf8'), before, 'hook must not touch a fullscreen toggle');
+    assert.equal(fs.statSync(settingsPath).mtimeMs, mtimeBefore, 'file not rewritten');
+  });
+
+  // Regression guard for the original mid-session heal: with NO tui key, a dropped
+  // statusLine must still be restored by the hook path within one turn.
+  it('hook run still restores a dropped statusLine when not in fullscreen', () => {
+    fs.writeFileSync(settingsPath, JSON.stringify({ hooks: {} }, null, 2));
+    runHeal(installDir, settingsPath);
+    const settings = JSON.parse(fs.readFileSync(settingsPath, 'utf8'));
+    assert.ok(settings.statusLine?.command.includes('claudebar'), 'statusLine restored off fullscreen');
+  });
+
+  // Boundary — only the exact string "fullscreen" gates. Any other tui value
+  // (e.g. "default") is a normal rendering mode that DOES carry a statusLine, so
+  // a dropped statusLine must be restored.
+  it('hook run restores statusLine when tui is set but not "fullscreen"', () => {
+    fs.writeFileSync(settingsPath, JSON.stringify({ tui: 'default', hooks: {} }, null, 2));
+    runHeal(installDir, settingsPath);
+    const settings = JSON.parse(fs.readFileSync(settingsPath, 'utf8'));
+    assert.ok(settings.statusLine?.command.includes('claudebar'), 'statusLine restored for tui:default');
+  });
+
+  // Edge — fullscreen takes precedence even over a catastrophic clobber that also
+  // stripped the heal hook. Healing settings.json while CC is fullscreen would
+  // still trigger the reload/exit; the daemon-timer path recovers once fullscreen
+  // exits (the tui key is gone then). The hook path stands down entirely here.
+  it('hook run does not heal even a hook-less clobber while fullscreen', () => {
+    fs.writeFileSync(
+      settingsPath,
+      JSON.stringify({ tui: 'fullscreen', hooks: {} }, null, 2)
+    );
+    const before = fs.readFileSync(settingsPath, 'utf8');
+    const mtimeBefore = fs.statSync(settingsPath).mtimeMs;
+    runHeal(installDir, settingsPath);
+    assert.equal(fs.readFileSync(settingsPath, 'utf8'), before, 'fullscreen gate wins over clobber');
+    assert.equal(fs.statSync(settingsPath).mtimeMs, mtimeBefore, 'file not rewritten while fullscreen');
+  });
+
   // Idempotency — when both statusLine and the hook are already correct, a heal
   // run must not churn the file (no-op write would dirty mtime / git status).
   it('does not rewrite settings.json when nothing is missing', () => {

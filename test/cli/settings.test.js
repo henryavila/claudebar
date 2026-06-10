@@ -283,7 +283,9 @@ describe('settings.healAll (full-parity restore)', () => {
 // systemd's start-limit, killing the daemon. So the daemon-path heal acts ONLY on a
 // genuine catastrophic clobber: skip while CC is in a fullscreen TUI, and skip while
 // the heal hook still lives (the hook recovers statusLine at the next turn). The
-// hook path (daemon:false) keeps its unconditional mid-session restore.
+// fullscreen skip applies to BOTH paths (CC's fullscreen is a persistent mode, so
+// the per-turn hook would otherwise fight it once per prompt); the live-hook skip
+// is daemon-only — the hook path does the restoring and does not defer to itself.
 describe('settings.healAll (daemon mode — catastrophic-clobber-only gate)', () => {
   function commands(s, event) {
     return (s.hooks?.[event] ?? []).flatMap((e) => (e.hooks ?? []).map((h) => h.command));
@@ -331,10 +333,22 @@ describe('settings.healAll (daemon mode — catastrophic-clobber-only gate)', ()
     assert.equal(s.statusLine, undefined);
   });
 
-  it('hook path (daemon:false) still restores statusLine regardless of tui state', () => {
-    // The hook only ever fires outside fullscreen, but the default mode must keep
-    // its unconditional restore so mid-session recovery is unaffected by this gate.
+  it('hook path (daemon:false) ALSO stands down while in a fullscreen TUI', () => {
+    // CC's fullscreen TUI (2.1.89+) is a persistent, user-chosen mode and the
+    // UserPromptSubmit heal fires every turn WHILE it is active. Restoring
+    // statusLine then makes CC hot-reload and drop out of fullscreen, once per
+    // prompt. So fullscreen gates BOTH paths — the hook does not restore here.
     const s = { tui: 'fullscreen' };
+    ensureHealHook(s);
+    const { changed } = healAll(s);
+    assert.equal(changed, false, 'hook path stands down while fullscreen');
+    assert.equal(s.statusLine, undefined, 'statusLine left dropped — CC owns it in fullscreen');
+  });
+
+  it('hook path (daemon:false) restores statusLine when NOT in fullscreen', () => {
+    // Regression guard for mid-session recovery: off fullscreen the hook keeps its
+    // one-turn unconditional restore. A live hook does NOT make it defer to itself.
+    const s = {};
     ensureHealHook(s);
     const { changed } = healAll(s);
     assert.equal(changed, true);
