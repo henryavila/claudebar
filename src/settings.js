@@ -170,17 +170,26 @@ function healHookPresent(settings) {
 // file when nothing is gone. Mutates `settings` in place. Returns changed:true if
 // ANY of the three restored something.
 //
-// `opts.daemon` switches to the conservative path the OS daemon needs. The daemon
-// fires on EVERY settings.json write — including CC's transient fullscreen-TUI
-// drop — so an unconditional heal there starts a write-fight (daemon restores →
-// CC re-drops while still fullscreen → …) that flickers the TUI and trips
-// systemd's start-limit, killing the daemon. In daemon mode we therefore act ONLY
-// on a genuine catastrophic clobber: skip while CC is in a fullscreen TUI, and
-// skip while the heal hook still lives (it recovers statusLine at the next turn).
-// The hook path (daemon:false, the default) keeps its unconditional restore so
-// mid-session recovery is unaffected.
+// Fullscreen gates BOTH paths. CC's fullscreen TUI (2.1.89+) is a persistent,
+// user-chosen rendering mode with no inline statusLine; while it is active CC
+// re-persists settings WITHOUT the statusLine block. ANY external restore then —
+// daemon OR the per-turn UserPromptSubmit hook — makes CC hot-reload the
+// statusLine and drop out of fullscreen, once per write/prompt. So we stand down
+// entirely while tui:fullscreen: there is no statusline to heal, and on leaving
+// fullscreen the next SessionStart/UserPromptSubmit (or the daemon timer) restores
+// it within one turn — no recovery capability is lost.
+//
+// `opts.daemon` adds one more conservative skip the OS daemon needs: it fires on
+// EVERY settings.json write, so even off-fullscreen an unconditional heal there
+// would write-fight a live hook (daemon restores → CC re-drops → …) and trip
+// systemd's start-limit. In daemon mode we therefore also defer while the heal
+// hook still lives — it recovers statusLine at the next turn. The hook path
+// (daemon:false) does the restoring; it does not defer to itself.
 export function healAll(settings, { daemon = false } = {}) {
-  if (daemon && (isFullscreenTui(settings) || healHookPresent(settings))) {
+  if (isFullscreenTui(settings)) {
+    return { changed: false };
+  }
+  if (daemon && healHookPresent(settings)) {
     return { changed: false };
   }
   const sl = ensureStatusLine(settings);

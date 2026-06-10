@@ -1,5 +1,13 @@
 # Changelog
 
+## v1.3.5 — 2026-06-10
+
+### Fix: the self-heal hook no longer fights Claude Code's fullscreen TUI
+
+v1.3.2 (PR #16) stopped the **OS daemon** from restoring `statusLine` while Claude Code is in its fullscreen TUI — but it deliberately left the **hook path** (the `UserPromptSubmit` / `SessionStart` heal) unconditional, on the stale assumption that fullscreen was a transient overlay. In current Claude Code (2.1.89+) fullscreen is a **persistent, user-chosen rendering mode** with no inline statusLine: while it is active CC re-persists `settings.json` *without* the `statusLine` block. The per-turn hook restored it every prompt, CC hot-reloaded the block, and the TUI dropped out of fullscreen — once per submitted prompt.
+
+`healAll` now applies the fullscreen gate to **both** paths: while `tui:"fullscreen"`, the heal stands down entirely (there is no statusline to heal). On leaving fullscreen, the next `SessionStart` / `UserPromptSubmit` — or the daemon timer — restores `statusLine` within one turn, so no mid-session recovery is lost. The `healHookPresent` defer remains daemon-only (the hook path does the restoring and does not defer to itself). Locked by 5 new tests (regression + boundary + edge, hook and unit level).
+
 ## v1.3.4 — 2026-06-07
 
 ### Fix: the 7d percentage no longer gets truncated on narrow mobile widths
