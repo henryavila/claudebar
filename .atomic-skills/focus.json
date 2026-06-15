@@ -1,0 +1,14 @@
+{
+  "schemaVersion": "0.1",
+  "generatedAt": "2026-06-15T19:05:00Z",
+  "projectId": "claudebar",
+  "plan":  { "slug": "atomic-skills-focus-chip", "title": "atomic-skills focus chip", "status": "active" },
+  "phase": { "id": "F0", "slug": "atomic-skills-focus-chip", "title": "Chip de foco", "index": 1, "total": 1, "status": "active" },
+  "tasks": { "done": 6, "total": 6, "blocked": 0 },
+  "gates": { "met": 0, "total": 0 },
+  "nextAction": "Commit + bump 1.4.0 + PR",
+  "flags": { "drift": false, "multipleActivePlans": true },
+  "sources": [
+    { "path": ".atomic-skills/initiatives/atomic-skills-focus-chip.md", "lastUpdated": "2026-06-15T19:05:00Z" }
+  ]
+}
