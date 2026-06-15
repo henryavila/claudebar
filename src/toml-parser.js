@@ -4,10 +4,10 @@ const VALID_KEYS = {
   update: ['auto_update', 'auto_update_interval_hours'],
   daemon: ['enabled'],
   layout: ['force', 'refresh_interval'],
-  chips: ['model', 'effort', 'tmux', 'repo', 'branch', 'worktree', 'dirty', 'pr', 'agent', 'ctx_bar', 'five_hour_bar', 'seven_day_bar', 'countdown', 'time_marker', 'update'],
+  chips: ['model', 'effort', 'tmux', 'repo', 'branch', 'worktree', 'dirty', 'pr', 'agent', 'ctx_bar', 'five_hour_bar', 'seven_day_bar', 'countdown', 'time_marker', 'update', 'project'],
   thresholds: ['warning', 'critical'],
-  colors: ['model', 'model_dim', 'effort_low', 'effort_med', 'effort_high', 'effort_xhigh', 'effort_max', 'repo', 'worktree', 'branch', 'dirty', 'clean', 'pr_pending', 'pr_approved', 'pr_changes', 'pr_draft', 'bar_green', 'bar_yellow', 'bar_red', 'bar_dim', 'agent', 'tmux', 'separator', 'update'],
-  glyphs: ['sparkle', 'pencil', 'git', 'pr', 'tmux', 'gear', 'worktree', 'update'],
+  colors: ['model', 'model_dim', 'effort_low', 'effort_med', 'effort_high', 'effort_xhigh', 'effort_max', 'repo', 'worktree', 'branch', 'dirty', 'clean', 'pr_pending', 'pr_approved', 'pr_changes', 'pr_draft', 'bar_green', 'bar_yellow', 'bar_red', 'bar_dim', 'agent', 'tmux', 'separator', 'update', 'project', 'project_stale', 'project_blocked'],
+  glyphs: ['sparkle', 'pencil', 'git', 'pr', 'tmux', 'gear', 'worktree', 'update', 'project', 'drift', 'multiplan'],
 };
 
 export function parseTOML(content) {

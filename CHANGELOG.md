@@ -1,5 +1,19 @@
 # Changelog
 
+## v1.4.0 — 2026-06-15
+
+### New: atomic-skills project focus chip (desktop-only)
+
+The `atomic-skills:project` skill publishes a flat `.atomic-skills/focus.json` projection of "where am I" (plan → phase → task). claudebar now reads that **one** file and renders a glanceable focus chip on the **second row** (after the ctx/5h/7d gauges, where there's horizontal room): `◉ <plan-id> · <F i/n> · <done/total>`. It is **desktop-only** (full layout) — never rendered in the compact/mobile layout.
+
+- **No-op by default for everyone else.** When `.atomic-skills/focus.json` is absent (the common case for users without atomic-skills), `plan` is null, or the `schemaVersion` is unknown, the chip renders nothing — so it's safe on by default (`[chips] project`).
+- **Freshness oracle (never shows stale data as fresh).** `focus.json` is derived data; a mid-session `git checkout` or external edit can outdate it with no producer hook firing. The chip re-reads each `sources[]` file's `lastUpdated`/`last_updated` frontmatter and compares it to the recorded value — on mismatch or a missing source it shows a dim `~` instead of pretending the numbers are current. Uses `lastUpdated` content (not mtime, which `git checkout` resets → false-stale).
+- **Markers.** `⚠N` when tasks are blocked (chip recolors), `⌁` on completion drift, and `` (nf-fa-clone) when more than one plan is active (the chip shows one of several).
+- **Full plan id** by default (`PROJECT_SLUG_MAX` opt-in cap). Git-root is resolved by a pure-bash walk from the CWD (no `git` subprocess), so the no-atomic-skills path costs only a couple of stat calls and the render stays inside the <50ms budget.
+- **Config.** `[chips] project`, `[colors] project / project_stale / project_blocked`, `[glyphs] project / drift / multiplan`.
+
+Covered by `test/unit/test-project-chip.sh` (fresh / blocked / drift / multipleActivePlans / stale / legacy `last_updated` / `phase:null` regression / empty slug / full-id / `PROJECT_SLUG_MAX` / null-plan / unknown-version / chip-off / absent). `test/run-fixture.sh` disables the chip so repo state never leaks into snapshots.
+
 ## v1.3.5 — 2026-06-10
 
 ### Fix: the self-heal hook no longer fights Claude Code's fullscreen TUI
