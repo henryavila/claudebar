@@ -1,8 +1,8 @@
 ---
 initiative_id: atomic-skills-focus-chip
-status: active
+status: shipped
 started: 2026-06-15
-last_updated: 2026-06-15T19:05:00Z
+last_updated: 2026-06-15T22:05:00Z
 branch: feat/atomic-skills-focus-chip
 worktree:
 plan_link:
@@ -32,7 +32,7 @@ parked: []
 
 emerged: []
 
-next_action: "Tudo implementado + review 2 camadas (SHIP) + visual aprovado pelo usuário + handoff reconciliado. Falta: commit + bump 1.4.0 + abrir PR."
+next_action: "SHIPPED v1.4.0 — PR #20 merged (a75eaed), release publicado no npm via OIDC (latest=1.4.0), CI verde ubuntu+macos. Chip de foco do atomic-skills na linha 2."
 ---
 
 # atomic-skills focus chip — indicador de foco do projeto na statusline

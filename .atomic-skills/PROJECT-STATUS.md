@@ -12,7 +12,7 @@ Canonical entry point. Auto-updated by `atomic-skills:project-status`. Read firs
 
 | Slug | Status | Started | Branch | Next Action |
 |---|---|---|---|---|
-| atomic-skills-focus-chip | active | 2026-06-15 | feat/atomic-skills-focus-chip | Escrever a spec corrigida (docs/specs/), depois implementar project_chip() guiado por ela |
+| atomic-skills-focus-chip | shipped | 2026-06-15 | feat/atomic-skills-focus-chip | SHIPPED v1.4.0 (npm latest): chip desktop-only do focus.json na linha 2 (◉ plano · F i/n · done/total), staleness por lastUpdated, marcador multiplan. PR #20 merged; CI verde macOS+Ubuntu; review 2 camadas (1 CRITICAL phase:null corrigido) |
 | npm-distribution | active | 2026-05-26 | — | Create package.json and bin/cli.js scaffold per spec architecture |
 | midsession-selfheal | active | 2026-06-01 | — | TDD: register heal on UserPromptSubmit for mid-session statusLine recovery |
 | auto-update | shipped | 2026-06-01 | — | DONE: PR #13 merged (43ce411), release v1.2.1 publicado no npm via OIDC (latest=1.2.1). Reinstall agora oferece escolha de auto-update |
