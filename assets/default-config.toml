@@ -26,6 +26,7 @@
 # countdown = true
 # time_marker = true
 # update = true
+# project = true            # desktop-only focus chip; no-op when .atomic-skills/focus.json is absent
 
 [thresholds]
 # warning = 60
@@ -56,6 +57,9 @@
 # tmux = 105
 # separator = 238
 # update = 220
+# project = 39             # focus chip (fresh)
+# project_stale = 244      # focus chip when a source drifted (dim "~")
+# project_blocked = 220    # focus chip when a task is blocked
 
 [glyphs]
 # sparkle = "✦"
@@ -66,6 +70,9 @@
 # gear = ""
 # worktree = "⎇"
 # update = "⬆"
+# project = ""           # focus chip leader (nf-fa-dot-circle-o)
+# drift = "⌁"             # completion-drift marker on the focus chip
+# multiplan = ""          # >1 active plan marker (nf-fa-clone)
 
 [update]
 # Auto-update mode (checked once per session, throttled, in the background):

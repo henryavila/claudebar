@@ -57,6 +57,9 @@ readonly C_AGENT=${C_AGENT:-141}
 readonly C_TMUX=${C_TMUX:-105}
 readonly C_SEP=${C_SEP:-238}
 readonly C_UPDATE=${C_UPDATE:-220}
+readonly C_PROJECT=${C_PROJECT:-39}
+readonly C_PROJECT_STALE=${C_PROJECT_STALE:-244}
+readonly C_PROJECT_BLOCKED=${C_PROJECT_BLOCKED:-220}
 
 # ─── Quota window durations (seconds) — used by the time-elapsed marker ─
 # Anthropic's rate-limit windows are nominally 5 hours and 7 days. We pin
@@ -92,6 +95,15 @@ readonly GLYPH_FOLDER=${GLYPH_FOLDER:-$'\xef\x81\xbb'}
 # GLYPH_UPDATE U+2B06 (upwards arrow) — "update available" chip. Not a Private
 # Use Area glyph, so a literal byte sequence is safe here.
 readonly GLYPH_UPDATE=${GLYPH_UPDATE:-$'\xe2\xac\x86'}
+# GLYPH_PROJECT U+F192 nf-fa-dot-circle-o — atomic-skills focus chip leader (a
+# filled target = "focus", in the same Font Awesome family as the other chips).
+# GLYPH_DRIFT U+2301 ⌁ — completion-drift marker on the same chip.
+# GLYPH_MULTIPLAN U+F0C5 nf-fa-clone — "more than one active plan" marker (the
+# chip shows one of several). Kept as UTF-8 byte sequences for transport safety,
+# same rationale as the other glyphs.
+readonly GLYPH_PROJECT=${GLYPH_PROJECT:-$'\xef\x86\x92'}
+readonly GLYPH_DRIFT=${GLYPH_DRIFT:-$'\xe2\x8c\x81'}
+readonly GLYPH_MULTIPLAN=${GLYPH_MULTIPLAN:-$'\xef\x83\x85'}
 
 # ─── Chip toggle defaults ────────────────────────────────────────────
 readonly CHIP_MODEL=${CHIP_MODEL:-1}
@@ -109,6 +121,7 @@ readonly CHIP_SEVEN_DAY_BAR=${CHIP_SEVEN_DAY_BAR:-1}
 readonly CHIP_COUNTDOWN=${CHIP_COUNTDOWN:-1}
 readonly CHIP_TIME_MARKER=${CHIP_TIME_MARKER:-1}
 readonly CHIP_UPDATE=${CHIP_UPDATE:-1}
+readonly CHIP_PROJECT=${CHIP_PROJECT:-1}
 
 # ─── ANSI helpers ──────────────────────────────────────────────────────
 esc=$'\033'
@@ -577,6 +590,112 @@ update_chip() {
     fg "$C_UPDATE" "${GLYPH_UPDATE} v${ver}"
 }
 
+# ─── resolve_git_root DIR — walk up from DIR to the repo root, no subprocess ──
+# Prints the first ancestor (inclusive) containing a .git entry (dir OR file —
+# worktrees use a .git file). Empty + non-zero when none found. Pure bash stat
+# calls, so it is far cheaper than spawning `git rev-parse --show-toplevel` —
+# which matters because the project chip resolves the root on every render.
+resolve_git_root() {
+    local d=$1 prev
+    while [[ -n "$d" && "$d" != "/" ]]; do
+        [[ -e "$d/.git" ]] && { printf '%s' "$d"; return 0; }
+        prev=$d; d=${d%/*}
+        [[ "$d" == "$prev" ]] && break   # no slash to strip (relative path) → stop
+    done
+    [[ -e "/.git" ]] && { printf '/'; return 0; }
+    return 1
+}
+
+# ─── project_chip — atomic-skills focus.json → "◉ plan · F i/n · done/total" ──
+# Desktop-only: called ONLY from fuel_row() (row 2), never from compact_row*.
+# Reads ONE flat file (the producer's denormalized projection) and renders a
+# glanceable "where am I in the project" chip. Contract + rationale:
+#   docs/specs/atomic-skills-focus-chip.md
+#   ~/atomic-skills/meta/schemas/focus.schema.json
+# Arg $1 = repo root (git-root; caller resolves it). focus.json lives at the
+# repo root, NOT the CWD, so the path is anchored there. Fail-open everywhere:
+# absent file / plan:null / unknown schemaVersion / bad JSON → render nothing.
+#
+# Freshness: focus.json is derived data the producer regenerates on mutations +
+# session hooks. It can go stale on a mid-session git checkout / external edit
+# no hook saw. The sources[] block records each source file's frontmatter
+# `lastUpdated` at emit time; we re-read it and compare (NOT mtime — checkout
+# resets mtime → false-stale). Mismatch / missing source → show a dim "~".
+project_chip() {
+    (( CHIP_PROJECT )) || return 0
+    local root=$1
+    [[ -n "$root" ]] || return 0
+    local f="$root/.atomic-skills/focus.json"
+    [[ -f "$f" ]] || return 0
+    have jq || return 0
+
+    # One jq pass. Line 1 = render fields; each following line = one source as
+    # "path<US>lastUpdated". Fields are joined with U+001F (unit separator) — a
+    # NON-whitespace char — NOT a tab: bash `read` with a whitespace IFS collapses
+    # runs and drops empty fields, so a schema-valid empty field (e.g. phase.id
+    # when phase is null) would shift every column left and corrupt the parse.
+    local US=$'\037'
+    local data
+    data=$(jq -rj '
+        def row: join("\u001f");
+        if (.plan == null) or (.schemaVersion != "0.1") then "SKIP\n"
+        else
+          ([ .plan.slug, (.phase.id // ""), (.phase.index // 0 | tostring),
+             (.phase.total // 0 | tostring), (.tasks.done // 0 | tostring),
+             (.tasks.total // 0 | tostring), (.tasks.blocked // 0 | tostring),
+             (.flags.drift // false | tostring),
+             (.flags.multipleActivePlans // false | tostring) ] | row), "\n",
+          ( [ .sources[]? | [ .path, (.lastUpdated // "") ] | row ] | join("\n") )
+        end' "$f" 2>/dev/null) || return 0
+    [[ -z "$data" || "$data" == "SKIP" ]] && return 0
+
+    local slug="" pid="" pidx="" ptot="" tdone="" ttot="" tblk="" drift="" multi=""
+    local stale=0 first=1 line path recorded current
+    while IFS= read -r line; do
+        if (( first )); then
+            IFS=$US read -r slug pid pidx ptot tdone ttot tblk drift multi <<<"$line"
+            first=0
+            continue
+        fi
+        [[ -z "$line" ]] && continue
+        (( stale )) && continue          # already stale → skip remaining greps
+        IFS=$US read -r path recorded <<<"$line"
+        [[ -z "$path" ]] && continue
+        local sf="$root/$path"
+        if [[ ! -f "$sf" ]]; then stale=1; continue; fi
+        # Accept both the contract field (lastUpdated, nested layout) and the
+        # legacy flat field (last_updated) — a strict superset of the contract.
+        # Strip "key:" + surrounding whitespace/quotes only (keep interior).
+        current=$(grep -m1 -E '^(lastUpdated|last_updated):' "$sf" \
+                  | sed -E 's/^[^:]+:[[:space:]]*//; s/[[:space:]]+$//; s/^["'\'']//; s/["'\'']$//')
+        # Compare only when BOTH sides have a value; an empty side is
+        # indeterminate (field absent producer- or consumer-side) → assume fresh.
+        [[ -n "$current" && -n "$recorded" && "$current" != "$recorded" ]] && stale=1
+    done <<<"$data"
+
+    [[ -z "$slug" ]] && return 0
+    # Numeric/boolean fallbacks so a malformed digest degrades, never crashes.
+    [[ "$tblk" =~ ^[0-9]+$ ]] || tblk=0
+    [[ "$drift" == "true" ]] || drift=false
+
+    # Show the full plan id by default (row 2 has room). PROJECT_SLUG_MAX caps it
+    # only as a runaway guard; set to 0 to disable truncation entirely.
+    local max=${PROJECT_SLUG_MAX:-0}
+    local slug_disp=$slug
+    if (( max > 0 )) && (( ${#slug} > max )); then slug_disp=${slug:0:max}"…"; fi
+    # ">1 active plan" marker — the chip shows one of several (e.g. invariant
+    # "≤1 active plan/branch" violated). Sits right after the slug.
+    local marker=""; [[ "$multi" == "true" ]] && marker=" ${GLYPH_MULTIPLAN}"
+    local body="${GLYPH_PROJECT} ${slug_disp}${marker} · ${pid} ${pidx}/${ptot} · ${tdone}/${ttot}"
+    (( tblk > 0 )) && body+=" ⚠${tblk}"
+    [[ "$drift" == "true" ]] && body+=" ${GLYPH_DRIFT}"
+
+    local color=$C_PROJECT
+    (( tblk > 0 )) && color=$C_PROJECT_BLOCKED
+    if (( stale )); then color=$C_PROJECT_STALE; body+=" ~"; fi
+    fg "$color" "$body"
+}
+
 # ─── identity_row — compose row 1 ─────────────────────────────────────
 # Usage: identity_row key=value key=value ...
 # Keys: model effort owner repo worktree branch dirty_count
@@ -686,7 +805,7 @@ identity_row() {
 # When absent / zero / non-numeric, falls back to "label bar pct%".
 fuel_row() {
     local ctx="" five_hour="" seven_day=""
-    local five_hour_resets_at="" seven_day_resets_at=""
+    local five_hour_resets_at="" seven_day_resets_at="" git_root=""
     local arg
     for arg in "$@"; do
         case "$arg" in
@@ -695,6 +814,7 @@ fuel_row() {
             seven_day=*)            seven_day=${arg#seven_day=} ;;
             five_hour_resets_at=*)  five_hour_resets_at=${arg#five_hour_resets_at=} ;;
             seven_day_resets_at=*)  seven_day_resets_at=${arg#seven_day_resets_at=} ;;
+            git_root=*)             git_root=${arg#git_root=} ;;
         esac
     done
 
@@ -759,6 +879,18 @@ fuel_row() {
         fg "$(zone_color "$seven_day")" "$(printf '%2d%%' "$seven_day")"
     fi
 
+    # ── Project focus chip (atomic-skills focus.json; desktop-only) ──
+    # Lives on row 2, after the fuel gauges (more horizontal room here than
+    # row 1). Renders nothing when off / no git-root / no focus.json.
+    if (( CHIP_PROJECT )) && [[ -n "$git_root" ]]; then
+        local proj
+        proj=$(project_chip "$git_root")
+        if [[ -n "$proj" ]]; then
+            printf '   '
+            printf '%s' "$proj"
+        fi
+    fi
+
     printf '\n'
 }
 
@@ -820,6 +952,14 @@ main() {
         DIRTY=$(dirty_count "$SESSION_ID")
     fi
 
+    # Derive git-root for the project focus chip (anchors .atomic-skills/focus.json
+    # at the repo root, not the CWD). Walked from CWD without spawning git, so the
+    # common no-atomic-skills case costs only a few stat calls. Chip-gated.
+    local GIT_ROOT=""
+    if (( CHIP_PROJECT )) && [[ -n "$CWD" ]]; then
+        GIT_ROOT=$(resolve_git_root "$CWD") || GIT_ROOT=""
+    fi
+
     # Cast FIVE_HOUR / SEVEN_DAY (jq emits floats like "23.5") to int
     [[ -n "$FIVE_HOUR" ]] && FIVE_HOUR=$(printf '%.0f' "$FIVE_HOUR")
     [[ -n "$SEVEN_DAY" ]] && SEVEN_DAY=$(printf '%.0f' "$SEVEN_DAY")
@@ -865,7 +1005,8 @@ main() {
             five_hour="$FIVE_HOUR" \
             seven_day="$SEVEN_DAY" \
             five_hour_resets_at="$FIVE_HOUR_RESETS_AT" \
-            seven_day_resets_at="$SEVEN_DAY_RESETS_AT"
+            seven_day_resets_at="$SEVEN_DAY_RESETS_AT" \
+            git_root="$GIT_ROOT"
     fi
 }
 

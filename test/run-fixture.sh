@@ -53,7 +53,10 @@ fi
 # Unset TMUX so tmux_chip stays empty in integration fixtures — fixture
 # output should be deterministic regardless of whether tests run inside tmux.
 # (test/unit/test-tmux.sh covers the tmux feature explicitly with mocked env.)
-actual=$(unset TMUX; "$script" < "$fixture")
+# Disable the project focus chip for the same reason: it reads the real repo's
+# .atomic-skills/focus.json (resolved via git-root), which is mutable repo state
+# that would leak into snapshots. (test/unit/test-project-chip.sh covers it.)
+actual=$(unset TMUX; CHIP_PROJECT=0 "$script" < "$fixture")
 expected_content=$(cat "$expected")
 
 if [[ "$actual" == "$expected_content" ]]; then
