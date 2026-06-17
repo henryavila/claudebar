@@ -1,8 +1,8 @@
 ---
 initiative_id: npm-distribution
-status: active
+status: shipped
 started: 2026-05-26
-last_updated: 2026-05-27T00:59:42Z
+last_updated: 2026-06-17T13:36:22Z
 branch:
 worktree:
 plan_link: docs/superpowers/specs/2026-05-26-config-system-design.md
@@ -19,7 +19,7 @@ parked: []
 
 emerged: []
 
-next_action: "Create package.json and bin/cli.js scaffold per spec architecture"
+next_action: "SHIPPED: package.json (@henryavila/claudebar, bin claudebar→bin/cli.js, files[]) + bin/cli.js + src/ CLI implementados e publicados no npm (v1.4.0). Validado 2026-06-17."
 ---
 
 # Package claudebar as npm with npx CLI and TOML config

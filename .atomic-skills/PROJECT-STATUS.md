@@ -1,6 +1,6 @@
 ---
-last_updated: 2026-06-15T18:35:00Z
-active_count: 6
+last_updated: 2026-06-17T13:36:22Z
+active_count: 0
 archived_count: 3
 ---
 
@@ -13,8 +13,8 @@ Canonical entry point. Auto-updated by `atomic-skills:project-status`. Read firs
 | Slug | Status | Started | Branch | Next Action |
 |---|---|---|---|---|
 | atomic-skills-focus-chip | shipped | 2026-06-15 | feat/atomic-skills-focus-chip | SHIPPED v1.4.0 (npm latest): chip desktop-only do focus.json na linha 2 (◉ plano · F i/n · done/total), staleness por lastUpdated, marcador multiplan. PR #20 merged; CI verde macOS+Ubuntu; review 2 camadas (1 CRITICAL phase:null corrigido) |
-| npm-distribution | active | 2026-05-26 | — | Create package.json and bin/cli.js scaffold per spec architecture |
-| midsession-selfheal | active | 2026-06-01 | — | TDD: register heal on UserPromptSubmit for mid-session statusLine recovery |
+| npm-distribution | shipped | 2026-05-26 | — | SHIPPED: package.json + bin/cli.js + src/ CLI publicados no npm (v1.4.0). Validado 2026-06-17 |
+| midsession-selfheal | shipped | 2026-06-01 | — | SHIPPED: heal em SessionStart+UserPromptSubmit (settings.js:30, install/update). Validado 2026-06-17 |
 | auto-update | shipped | 2026-06-01 | — | DONE: PR #13 merged (43ce411), release v1.2.1 publicado no npm via OIDC (latest=1.2.1). Reinstall agora oferece escolha de auto-update |
 | locale-float-bug | shipped | 2026-06-02 | — | SHIPPED in v1.3.1: `export LC_NUMERIC=C` fixes 7d/5h=0% under comma locale; +test/unit/test-locale-float.sh; released to npm via OIDC |
 | native-daemon-selfheal | shipped | 2026-06-02 | — | SHIPPED v1.3.2 (npm latest): fixed daemon vs fullscreen-TUI write-fight (healAll daemon-mode gate + CLAUDEBAR_DAEMON=1) + .path start-limit fragility (StartLimitIntervalSec=0). PR #16 merged; CI green on macOS + Ubuntu. |
