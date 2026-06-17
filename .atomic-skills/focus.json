@@ -1,12 +1,14 @@
 {
   "schemaVersion": "0.1",
-  "generatedAt": "2026-06-17T13:36:22Z",
+  "generatedAt": "2026-06-17T13:40:00Z",
   "projectId": "claudebar",
-  "plan": null,
-  "phase": null,
-  "tasks": null,
+  "plan": "overlay-time-marker",
+  "phase": { "id": "F0", "index": 1, "total": 1, "title": "Marcador de tempo overlay" },
+  "tasks": { "done": 0, "total": 3 },
   "gates": null,
-  "nextAction": null,
+  "nextAction": "T1 RED: reescrever testes de marcador p/ overlay + cor do pipe",
   "flags": { "drift": false, "multipleActivePlans": false },
-  "sources": []
+  "sources": [
+    { "path": ".atomic-skills/initiatives/overlay-time-marker.md", "lastUpdated": "2026-06-17T13:40:00Z" }
+  ]
 }

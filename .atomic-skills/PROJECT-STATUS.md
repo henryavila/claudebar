@@ -1,6 +1,6 @@
 ---
-last_updated: 2026-06-17T13:36:22Z
-active_count: 0
+last_updated: 2026-06-17T13:40:00Z
+active_count: 1
 archived_count: 3
 ---
 
@@ -12,6 +12,7 @@ Canonical entry point. Auto-updated by `atomic-skills:project-status`. Read firs
 
 | Slug | Status | Started | Branch | Next Action |
 |---|---|---|---|---|
+| overlay-time-marker | active | 2026-06-17 | feat/overlay-time-marker | IMPLEMENTADO (T1-T3 done): marcador do tempo agora é OVERLAY (│ ocupa célula, cinza→cor-da-zona ao ser consumido). 203 CLI + 42 bash verde. DESIGN.md atualizado. Aguardando OK p/ commit+PR+release |
 | atomic-skills-focus-chip | shipped | 2026-06-15 | feat/atomic-skills-focus-chip | SHIPPED v1.4.0 (npm latest): chip desktop-only do focus.json na linha 2 (◉ plano · F i/n · done/total), staleness por lastUpdated, marcador multiplan. PR #20 merged; CI verde macOS+Ubuntu; review 2 camadas (1 CRITICAL phase:null corrigido) |
 | npm-distribution | shipped | 2026-05-26 | — | SHIPPED: package.json + bin/cli.js + src/ CLI publicados no npm (v1.4.0). Validado 2026-06-17 |
 | midsession-selfheal | shipped | 2026-06-01 | — | SHIPPED: heal em SessionStart+UserPromptSubmit (settings.js:30, install/update). Validado 2026-06-17 |
