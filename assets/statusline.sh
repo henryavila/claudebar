@@ -212,13 +212,19 @@ format_countdown() {
 }
 
 # ─── pip_bar PCT [MARKER_POS] — render 10-pip zone-colored bar ────────
-# When MARKER_POS is a number in [0..10], a dim │ is inserted at that slot
-# (0 = before pip 0, N = between pip N-1 and pip N, 10 = after pip 9).
-# Used by the time-elapsed marker on the 5h/7d chips: when the fill edge
-# and the marker disagree, the chip visually communicates "you're burning
-# faster than the window allows" (pipe inside fill) or "you have margin"
-# (pipe past the fill edge). Empty/unset marker preserves the 10-char
-# legacy render.
+# Time-elapsed marker (the │) is an OVERLAY: it OCCUPIES one of the 10
+# cells (cell index in [0..9]), replacing that pip — NOT an inserted 11th
+# char, so the bar width is always 10. Reading the 5h/7d cue:
+#   filled <  marker → "atrás": time cell still empty, you have margin.
+#   filled == marker → "encostou": cells before the pipe are full, but the
+#                      pipe cell itself is NOT yet consumed → not reached.
+#   filled >  marker → "passou": fill consumed the pipe cell → you reached
+#                      the time mark / are burning faster than the window.
+# The pipe's COLOR carries this: gray (C_REPO) until reached, then the zone
+# color once passed ("to reach the pipe it has to change"). The cell the
+# pipe sits on hides its own ▰/▱, so the color is what disambiguates the
+# ~10% band where the fill edge and the pipe coincide. Empty/unset marker
+# preserves the 10-char legacy render (no pipe).
 pip_bar() {
     local pct=$1
     local marker=${2:-}
@@ -228,36 +234,39 @@ pip_bar() {
     (( filled > 10 )) && filled=10
     (( filled < 0 ))  && filled=0
 
-    # Normalize / clamp marker to [0, 10] when numeric; treat anything else
-    # (empty, negative-string, non-digit) as "no marker".
+    # Marker is a CELL index in [0,9] (overlay). Clamp when numeric; treat
+    # anything else (empty, non-digit) as "no marker".
     local marker_active=0
     if [[ "$marker" =~ ^-?[0-9]+$ ]]; then
         marker_active=1
-        (( marker < 0 ))  && marker=0
-        (( marker > 10 )) && marker=10
+        (( marker < 0 )) && marker=0
+        (( marker > 9 )) && marker=9
     fi
 
     for ((i=0; i<10; i++)); do
         if (( marker_active && marker == i )); then
-            fg "$C_REPO" "│"
-        fi
-        if (( i < filled )); then
+            # Pipe occupies this cell: gray until the fill reaches it,
+            # zone color once consumed (filled > i).
+            if (( filled > i )); then
+                fg "$color" "│"
+            else
+                fg "$C_REPO" "│"
+            fi
+        elif (( i < filled )); then
             fg "$color" "▰"
         else
             fg "$C_BAR_DIM" "▱"
         fi
     done
-    if (( marker_active && marker == 10 )); then
-        fg "$C_REPO" "│"
-    fi
 }
 
 # ─── pip_bar_compact PCT [MARKER_POS] — 5-pip zone-colored bar (compact) ─
-# Mirrors pip_bar's time-elapsed marker, scaled to the 5-pip width: a dim │
-# is inserted at MARKER_POS in [0..5] (0 = before pip 0, N = between pip N-1
-# and pip N, 5 = after pip 4). Empty/unset marker preserves the legacy
-# 5-char render. Lets the mobile/compact 5h/7d chips show the same "are you
-# burning faster than the window allows" cue as the full layout.
+# Mirrors pip_bar's OVERLAY marker, scaled to the 5-pip width: the │
+# OCCUPIES one of the 5 cells (cell index in [0..4]), replacing that pip —
+# width stays 5. Same color rule as pip_bar: gray (C_REPO) while not yet
+# reached (filled <= marker), zone color once the fill consumes the pipe
+# cell (filled > marker). Empty/unset marker preserves the legacy 5-char
+# render (no pipe).
 pip_bar_compact() {
     local pct=$1
     local marker=${2:-}
@@ -267,28 +276,28 @@ pip_bar_compact() {
     (( filled > 5 )) && filled=5
     (( filled < 0 )) && filled=0
 
-    # Normalize / clamp marker to [0, 5] when numeric; treat anything else
-    # (empty, non-digit) as "no marker".
+    # Marker is a CELL index in [0,4] (overlay). Clamp when numeric; treat
+    # anything else (empty, non-digit) as "no marker".
     local marker_active=0
     if [[ "$marker" =~ ^-?[0-9]+$ ]]; then
         marker_active=1
         (( marker < 0 )) && marker=0
-        (( marker > 5 )) && marker=5
+        (( marker > 4 )) && marker=4
     fi
 
     for ((i=0; i<5; i++)); do
         if (( marker_active && marker == i )); then
-            fg "$C_REPO" "│"
-        fi
-        if (( i < filled )); then
+            if (( filled > i )); then
+                fg "$color" "│"
+            else
+                fg "$C_REPO" "│"
+            fi
+        elif (( i < filled )); then
             fg "$color" "▰"
         else
             fg "$C_BAR_DIM" "▱"
         fi
     done
-    if (( marker_active && marker == 5 )); then
-        fg "$C_REPO" "│"
-    fi
 }
 
 # ─── compact_row1 — session row (model + effort/agent + PR) ──────────

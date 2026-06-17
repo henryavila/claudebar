@@ -129,27 +129,32 @@ fall back defensively. Used by `test/run-all.sh` (`FROZEN_NOW = 1830000000`).
 
 #### Time-elapsed marker (`│`)
 
-When `resets_at` is present, the bar additionally gains a thin `│` marker
-showing **how far into the window we are**, in the same 10-pip resolution as
-the fill. The bar grows from 10 to 11 chars; the marker can land at any of
-11 slots (`0` = before pip 0, `N` = between pip N-1 and pip N, `10` = after
-pip 9). The juxtaposition is the whole point of the chip:
+When `resets_at` is present, the bar gains a thin `│` marker showing **how
+far into the window we are**, in the same 10-pip resolution as the fill. The
+marker is an **overlay**: it OCCUPIES one of the 10 cells (cell index in
+`[0,9]`), replacing that pip — so the bar width stays 10 (it is NOT an
+inserted 11th char). Filling the cells *before* the pipe does not count as
+reaching it; the marker cell is "reached" only when the fill consumes it.
+The juxtaposition is the whole point of the chip:
 
-| Marker vs fill edge | Reading | Example |
+| Fill vs marker cell | Reading | Example |
 |---|---|---|
-| Marker **at** fill edge | Burn rate matches time — on pace | `▰▰▰▰▰▰▰▰│▱▱` (89% usage, 89% elapsed) |
-| Marker **inside** fill | You're consuming faster than time — caution | `▰▰▰▰▰▰│▰▱▱▱` (72% usage, 40% elapsed) |
-| Marker **past** fill | Time is ahead of usage — you have margin | `▰▰▰▰▰▰▰▱│▱▱` (75% usage, 83% elapsed) |
+| `filled < marker` — **atrás** | Time cell still empty — you have margin | `▰▰▰▰▱▱▱│▱▱` (40% usage, time cell 7) |
+| `filled == marker` — **encostou** | Cells before the pipe full, pipe not yet consumed — not reached | `▰▰▰▰▰│▱▱▱▱` (50% usage, time cell 5) |
+| `filled > marker` — **passou** | Fill consumed the pipe cell — on/over pace, burning faster | `▰▰▰▰│▰▰▱▱▱` (72% usage, time cell 4) |
 
-Position formula: `marker_pos = elapsed * 10 / WINDOW`, where
-`elapsed = WINDOW - (resets_at - now)` clamped to `[0, WINDOW]`. Window
-durations are pinned (`WINDOW_5H_SECONDS = 18000`, `WINDOW_7D_SECONDS = 604800`)
-because Anthropic's rolling-window semantics aren't public — a fixed
-denominator is a good enough approximation for glanceable "burning fast?"
-reading.
+Position formula: `marker_pos = elapsed * 10 / WINDOW` (clamped to the cell
+range `[0,9]`), where `elapsed = WINDOW - (resets_at - now)` clamped to
+`[0, WINDOW]`. Window durations are pinned (`WINDOW_5H_SECONDS = 18000`,
+`WINDOW_7D_SECONDS = 604800`) because Anthropic's rolling-window semantics
+aren't public — a fixed denominator is a good enough approximation for
+glanceable "burning fast?" reading.
 
-Marker color: dim grey (245), same as the label and the countdown text —
-preserves the bar+% as the saturation signal and the marker as metadata.
+Marker color carries the state (the pipe cell hides its own `▰`/`▱`, so
+color is what disambiguates the ~10% band where fill and pipe coincide):
+**dim grey (245) until reached** (`filled <= marker` — atrás / encostou),
+then the **zone color** once the fill consumes it (`filled > marker` — green
+76 / yellow 220 / red 196). "To reach the pipe, it has to change."
 
 ### Special State — Agent Active
 

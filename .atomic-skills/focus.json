@@ -1,14 +1,14 @@
 {
   "schemaVersion": "0.1",
-  "generatedAt": "2026-06-15T22:05:00Z",
+  "generatedAt": "2026-06-17T13:40:00Z",
   "projectId": "claudebar",
-  "plan":  { "slug": "atomic-skills-focus-chip", "title": "atomic-skills focus chip", "status": "done" },
-  "phase": { "id": "F0", "slug": "atomic-skills-focus-chip", "title": "Chip de foco", "index": 1, "total": 1, "status": "done" },
-  "tasks": { "done": 6, "total": 6, "blocked": 0 },
-  "gates": { "met": 0, "total": 0 },
-  "nextAction": "SHIPPED v1.4.0",
-  "flags": { "drift": false, "multipleActivePlans": true },
+  "plan": "overlay-time-marker",
+  "phase": { "id": "F0", "index": 1, "total": 1, "title": "Marcador de tempo overlay" },
+  "tasks": { "done": 0, "total": 3 },
+  "gates": null,
+  "nextAction": "T1 RED: reescrever testes de marcador p/ overlay + cor do pipe",
+  "flags": { "drift": false, "multipleActivePlans": false },
   "sources": [
-    { "path": ".atomic-skills/initiatives/atomic-skills-focus-chip.md", "lastUpdated": "2026-06-15T22:05:00Z" }
+    { "path": ".atomic-skills/initiatives/overlay-time-marker.md", "lastUpdated": "2026-06-17T13:40:00Z" }
   ]
 }
