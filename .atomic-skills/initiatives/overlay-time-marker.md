@@ -1,8 +1,8 @@
 ---
 initiative_id: overlay-time-marker
-status: active
+status: shipped
 started: 2026-06-17
-last_updated: 2026-06-17T14:05:00Z
+last_updated: 2026-06-17T18:00:00Z
 branch: feat/overlay-time-marker
 worktree:
 plan_link:
@@ -28,7 +28,7 @@ parked: []
 
 emerged: []
 
-next_action: "Implementação COMPLETA na branch feat/overlay-time-marker. 203 CLI + 42 bash/fixtures verde, 0 falhas. DESIGN.md atualizado. Pronto para commit + PR + release (aguardando o OK do usuário)."
+next_action: "SHIPPED v1.5.0 (npm latest=1.5.0 via OIDC). PR #21 merged (56ea85c), CI verde ubuntu+macos. Marcador de tempo agora é overlay (│ ocupa célula, cinza→cor-da-zona ao ser consumido). Decisão de produto: manter o trade-off do pipe escondendo o fill da própria célula (validado com o usuário)."
 ---
 
 # overlay-time-marker — pipe do tempo como célula (overlay), não inserido
