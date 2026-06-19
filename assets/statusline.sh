@@ -22,6 +22,10 @@ _CB_CONFIG_TOML="$_CB_SCRIPT_DIR/config.toml"
 # The auto-updater drops the latest available version here for the update chip.
 # Overridable for tests; defaults to the install dir alongside this script.
 _CB_UPDATE_FILE="${CLAUDEBAR_UPDATE_FILE:-$_CB_SCRIPT_DIR/.update-available}"
+# The installed version (written by install/update). update_chip compares it
+# against .update-available so a notification that's already been satisfied does
+# not linger as a phantom alert. Overridable for tests.
+_CB_VERSION_FILE="${CLAUDEBAR_VERSION_FILE:-$_CB_SCRIPT_DIR/.version}"
 
 if [[ -f "$_CB_CONFIG_TOML" ]]; then
     _CB_CONFIG_SH="$_CB_SCRIPT_DIR/config.sh"
@@ -596,6 +600,31 @@ update_chip() {
     ver=$(<"$f")
     ver=${ver//[$'\n\r\t ']/}
     [[ -n "$ver" ]] || return 0
+
+    # Suppress a satisfied notification: the auto-updater clears .update-available
+    # only on its throttled "up to date" pass and never right after applying an
+    # update, so once installed catches up the file lingers with the now-current
+    # version. Re-derive the truth here — show only when the advertised version is
+    # strictly newer than the installed one. Compare x.y.z field-by-field as
+    # integers (1.10.0 > 1.9.0, not lexical). A missing/unparseable version on
+    # either side falls through and shows the chip (never hide a real update).
+    local vf="${2:-$_CB_VERSION_FILE}"
+    if [[ -f "$vf" ]]; then
+        local inst
+        inst=$(<"$vf")
+        inst=${inst//[$'\n\r\t ']/}
+        if [[ "$ver" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ && "$inst" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            local a1 a2 a3 i1 i2 i3 newer=0
+            IFS=. read -r a1 a2 a3 <<<"$ver"
+            IFS=. read -r i1 i2 i3 <<<"$inst"
+            if   (( a1 != i1 )); then (( a1 > i1 )) && newer=1
+            elif (( a2 != i2 )); then (( a2 > i2 )) && newer=1
+            elif (( a3 != i3 )); then (( a3 > i3 )) && newer=1
+            fi
+            (( newer )) || return 0
+        fi
+    fi
+
     fg "$C_UPDATE" "${GLYPH_UPDATE} v${ver}"
 }
 

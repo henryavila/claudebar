@@ -1,5 +1,19 @@
 # Changelog
 
+## v1.5.1 — 2026-06-19
+
+### Fix: the "update available" chip no longer lingers after you're up to date
+
+The auto-updater drops the latest published version into `.update-available`, and the statusline's update chip rendered that file **verbatim** — it never checked the version against the one actually installed (`.version`). The file is only ever cleared on `runAutoUpdate`'s throttled "up to date" pass (≤24h apart) and **never** right after an update is applied, so once you caught up to the advertised version the chip kept showing a phantom `⬆ v<current>` alert (everyone saw `⬆ v1.5.0` while already on 1.5.0).
+
+`update_chip` now re-derives the truth at render time: it surfaces the chip **only when the advertised version is strictly newer than the installed one**, comparing `x.y.z` field-by-field as integers (so `1.10.0 > 1.9.0`, not a lexical compare). A missing or unparseable version on either side falls through and shows the chip — a real update is never hidden on a parse failure. This self-heals any stale `.update-available` on the next render, regardless of how it went stale. Locked by 9 new cases in `test/unit/test-update-chip.sh` (regression + boundary + edge; 14 total).
+
+## v1.5.0 — 2026-06-17
+
+### Time-elapsed marker is now an overlay cell with a state-colored pipe
+
+The rate-limit time-elapsed marker (the `│` showing where you *should* be in a window) became an **overlay** cell: the pipe occupies a cell in the gauge and renders gray until consumed, then takes the zone color as the window burns down. Shipped via PR #21.
+
 ## v1.4.0 — 2026-06-15
 
 ### New: atomic-skills project focus chip (desktop-only)
