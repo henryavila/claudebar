@@ -48,6 +48,17 @@ check_marker() {
 # Back-compat: empty marker == no marker (legacy 10-char render, no pipe)
 check_marker 40 ""  "▰▰▰▰▱▱▱▱▱▱"
 
+errfile=$(mktemp)
+pip_bar 40 abc >/dev/null 2>"$errfile"
+err=$(cat "$errfile")
+rm -f "$errfile"
+if [[ -z "$err" ]]; then
+    echo "  ok: pip_bar non-numeric marker writes no stderr"
+else
+    echo "  FAIL: pip_bar non-numeric marker wrote stderr: $err"
+    fail=1
+fi
+
 # Marker occupies a cell; width is always 10 (│ replaces a pip)
 check_marker 40 0   "│▰▰▰▱▱▱▱▱▱"
 check_marker 40 9   "▰▰▰▰▱▱▱▱▱│"

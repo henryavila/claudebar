@@ -27,6 +27,7 @@ Fuel-gauge row (bottom) — *how much runway do I have?*
 
 - **Pip-style fuel gauges** with **zone-driven colors**: green `<60%`, yellow `60-89%`, red `≥90%` — applied independently to context window, 5-hour rate limit, and 7-day rate limit. The bar shape tells you "how full"; the color tells you "how worried".
 - **Quota reset countdown + time-elapsed marker** on the `5h` and `7d` chips: `5h · 2h18m  ▰▰▰▰│▰▰▱▱▱▱ 60%`. The text tells you *when* the window resets; the `│` inside the bar shows *how far* into the window you already are. When the marker is **inside** the fill, you're burning faster than time allows; **past** the fill, you have margin.
+- **GLM Coding Plan support**: when Claude Code is pointed at a GLM endpoint (`api.z.ai`, `open.bigmodel.cn`, or `dev.bigmodel.cn`), the `5h` chip can use the Z.ai monitor API's token quota percentage instead of Anthropic `rate_limits`. The refresh is detached and cached, so the statusline never waits on the network; non-GLM sessions never poll.
 - **Identity row** shows model, [reasoning effort](https://docs.claude.com/en/api/messages#extended-thinking), tmux pane context, repo, worktree, branch, dirty file count, and PR review state.
 - **Agent-active mode**: when a subagent is dispatched, the model name dims and a pulsing chip shows the agent name — at-a-glance "my turn is paused".
 - **Tmux integration**: when running inside tmux, the identity row gains a `tmux:session:window.pane` chip to disambiguate multiple Claude sessions across panes.
@@ -105,6 +106,7 @@ The config file is self-documenting — every option is listed with its default,
 | `[chips]` | Toggle any segment on/off: model, effort, tmux, repo, branch, worktree, dirty, PR, agent, each fuel gauge, countdown text, time marker |
 | `[layout]` | Force `compact` or `full` layout, set refresh interval |
 | `[glyphs]` | Override Nerd Font icons with any character |
+| `[quota]` | Enable/disable GLM quota polling and set the cache refresh interval |
 
 ### Example
 
@@ -119,6 +121,9 @@ critical = 80       # go red earlier
 [chips]
 tmux = false        # hide tmux chip
 countdown = false   # hide countdown text on fuel gauges
+
+[quota]
+refresh_interval_minutes = 5  # GLM quota cache TTL; minimum 1
 ```
 
 ## Update
@@ -144,8 +149,22 @@ Claude Code pipes a [JSON object](https://code.claude.com/docs/en/statusline#ava
 1. Parses every needed field in a single `jq -r` invocation using `@sh` for shell-safe quoting.
 2. Derives the current git branch and dirty-file count, with a 5-second session-scoped cache to avoid re-shelling `git` on every message.
 3. If `config.toml` exists, auto-recompiles `config.sh` when the TOML is newer (adds <1ms overhead per render).
-4. Composes two rows: `identity_row` (top) and `fuel_row` (bottom), with each chip checking its `CHIP_*` toggle and owning its preceding separator so absences don't leave orphan glyphs.
-5. Prints ANSI-colored text to stdout. Claude Code displays it below the prompt.
+4. On GLM endpoints, reads the cached Z.ai 5-hour token quota and spawns a detached refresh when stale; Anthropic and non-GLM sessions skip this path entirely.
+5. Composes two rows: `identity_row` (top) and `fuel_row` (bottom), with each chip checking its `CHIP_*` toggle and owning its preceding separator so absences don't leave orphan glyphs.
+6. Prints ANSI-colored text to stdout. Claude Code displays it below the prompt.
+
+### GLM quota monitoring
+
+Claude Code does not expose Anthropic-style `rate_limits.five_hour` data when it is configured for GLM. claudebar detects GLM from the inherited `ANTHROPIC_BASE_URL` host (`api.z.ai`, `open.bigmodel.cn`, or `dev.bigmodel.cn`) plus `ANTHROPIC_AUTH_TOKEN`, then refreshes `quota-cache.json` in the background by calling the Z.ai monitor endpoint. The token is sent exactly as Claude Code provides it, without adding `Bearer`.
+
+The rendered statusline always reads the local cache first. If the cache is missing or older than `[quota] refresh_interval_minutes`, claudebar starts `quota-fetch.mjs` detached and returns immediately; the next render sees the fresh value. The default TTL is 5 minutes, with a 1-minute minimum.
+
+Disable the GLM quota path:
+
+```toml
+[quota]
+enabled = false
+```
 
 ### Self-healing
 

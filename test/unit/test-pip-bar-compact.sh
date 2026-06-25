@@ -66,6 +66,16 @@ check_marker() {
 # Empty / non-numeric marker → legacy render, no pipe
 check_marker 50 ""   0 "empty marker = no pipe"
 check_marker 50 abc  0 "non-numeric = no pipe"
+errfile=$(mktemp)
+pip_bar_compact 50 abc >/dev/null 2>"$errfile"
+err=$(cat "$errfile")
+rm -f "$errfile"
+if [[ -z "$err" ]]; then
+    echo "  ok: pip_bar_compact non-numeric marker writes no stderr"
+else
+    echo "  FAIL: pip_bar_compact non-numeric marker wrote stderr: $err"
+    fail=1
+fi
 # Numeric marker in range → exactly one pipe
 check_marker 50 0    1 "marker at cell 0"
 check_marker 50 3    1 "marker mid-bar"

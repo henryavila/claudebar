@@ -22,7 +22,6 @@ export function parseTOML(content) {
     const sectionMatch = line.match(/^\[([a-z_]+)\]$/);
     if (sectionMatch) {
       section = sectionMatch[1];
-      config[section] ??= {};
       continue;
     }
 
@@ -31,6 +30,7 @@ export function parseTOML(content) {
       const key = kvMatch[1];
       let val = kvMatch[2].trim();
       val = val.replace(/^["']|["']$/g, '');
+      config[section] ??= {};
 
       if (section === 'chips' || section === 'daemon' || (section === 'quota' && key === 'enabled')) {
         config[section][key] = val === 'true';

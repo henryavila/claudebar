@@ -69,6 +69,93 @@ function getVersion() {
   return pkg.version;
 }
 
+function sectionBlocks(tomlContent) {
+  const blocks = [];
+  let current = null;
+  for (const line of tomlContent.split('\n')) {
+    const section = line.match(/^\s*\[([a-z_]+)\]\s*$/);
+    if (section) {
+      if (current) blocks.push(current);
+      current = { name: section[1], lines: [line] };
+    } else if (current) {
+      current.lines.push(line);
+    }
+  }
+  if (current) blocks.push(current);
+  return blocks;
+}
+
+function trimTrailingBlankLines(lines) {
+  const out = [...lines];
+  while (out.length > 0 && out[out.length - 1] === '') out.pop();
+  return out;
+}
+
+function keyNames(sectionLines) {
+  return new Set(
+    sectionLines
+      .map((line) => line.match(/^\s*#?\s*([a-z_]+)\s*=/)?.[1])
+      .filter(Boolean)
+  );
+}
+
+function defaultKeyLines(sectionLines) {
+  return sectionLines
+    .map((line) => {
+      const match = line.match(/^\s*#?\s*([a-z_]+)\s*=/);
+      return match ? { key: match[1], line } : null;
+    })
+    .filter(Boolean);
+}
+
+function appendMissingKeyLines(section, defaultBlock) {
+  const existingKeys = keyNames(section.lines);
+  const missing = defaultKeyLines(defaultBlock.lines).filter(({ key }) => !existingKeys.has(key));
+  if (missing.length === 0) return [];
+
+  section.lines = trimTrailingBlankLines(section.lines);
+  section.lines.push(...missing.map(({ line }) => line), '');
+  return missing.map(({ key }) => `[${section.name}] ${key}`);
+}
+
+function renderToml(preamble, sections) {
+  const lines = [...preamble];
+  for (const section of sections) lines.push(...section.lines);
+  const rendered = lines.join('\n');
+  return rendered.endsWith('\n') ? rendered : `${rendered}\n`;
+}
+
+function backfillDefaultSections(configToml, defaultConfig, log) {
+  const current = fs.readFileSync(configToml, 'utf8');
+  const parsed = sectionBlocks(current);
+  if (parsed.length === 0) return;
+
+  const preambleEnd = current.search(/^\s*\[[a-z_]+\]\s*$/m);
+  const preamble = preambleEnd > 0 ? current.slice(0, preambleEnd).split('\n') : [];
+  const existing = new Map(parsed.map((block) => [block.name, block]));
+  const added = [];
+  for (const block of sectionBlocks(fs.readFileSync(defaultConfig, 'utf8'))) {
+    const existingBlock = existing.get(block.name);
+    if (existingBlock) {
+      added.push(...appendMissingKeyLines(existingBlock, block));
+      continue;
+    }
+
+    const last = parsed[parsed.length - 1];
+    if (last.lines[last.lines.length - 1] !== '') last.lines.push('');
+    const newBlock = { name: block.name, lines: [...trimTrailingBlankLines(block.lines), ''] };
+    parsed.push(newBlock);
+    existing.set(newBlock.name, newBlock);
+    added.push(`[${block.name}]`);
+  }
+
+  if (added.length > 0) {
+    const next = renderToml(preamble, parsed);
+    fs.writeFileSync(configToml, next);
+    log(`Backfilled config.toml defaults: ${added.join(', ')}`);
+  }
+}
+
 function timestamp() {
   const d = new Date();
   const pad = (n) => String(n).padStart(2, '0');
@@ -117,8 +204,8 @@ export async function install({ configDir, settingsPath, chooseMode, log, noDaem
   log(`Copied GLM quota refresh (quota-fetch.mjs + quota.js)`);
 
   const configToml = path.join(configDir, 'config.toml');
+  const defaultConfig = path.join(ASSETS_DIR, 'default-config.toml');
   if (!fs.existsSync(configToml)) {
-    const defaultConfig = path.join(ASSETS_DIR, 'default-config.toml');
     fs.copyFileSync(defaultConfig, configToml);
     log(`Generated config.toml from defaults`);
     // Fresh install: offer the auto-update prompt. A null choice (no TTY) keeps
@@ -126,6 +213,7 @@ export async function install({ configDir, settingsPath, chooseMode, log, noDaem
     await offerAutoUpdateChoice(configToml, chooseMode, log);
   } else {
     log(`config.toml already exists — preserved`);
+    backfillDefaultSections(configToml, defaultConfig, log);
     // Reinstall: if the user never picked a mode (line still commented/absent),
     // offer the choice now. setModeInToml only touches the auto_update line, so
     // every other setting they customized is left exactly as-is. An already-set

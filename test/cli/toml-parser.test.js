@@ -60,8 +60,24 @@ describe('parseTOML', () => {
   it('parses [daemon] enabled as a real boolean (not the string "false")', () => {
     assert.equal(parseTOML('[daemon]\nenabled = false').daemon.enabled, false);
     assert.equal(parseTOML('[daemon]\nenabled = true').daemon.enabled, true);
-    // a header with only commented keys → empty section → opt-out check sees undefined (= on)
-    assert.deepEqual(parseTOML('[daemon]\n# enabled = true').daemon, {});
+    // a header with only commented keys should not materialize a section.
+    assert.equal(parseTOML('[daemon]\n# enabled = true').daemon, undefined);
+  });
+
+  it('parses [quota] enabled and refresh interval with the right types', () => {
+    const cfg = parseTOML('[quota]\nenabled = false\nrefresh_interval_minutes = 1');
+    assert.equal(cfg.quota.enabled, false);
+    assert.equal(cfg.quota.refresh_interval_minutes, 1);
+    assert.equal(typeof cfg.quota.refresh_interval_minutes, 'number');
+  });
+
+  it('ignores sections that only contain commented defaults', () => {
+    assert.deepEqual(parseTOML('[future]\n# enabled = true\n# interval = 5'), {});
+  });
+
+  it('does not reject future template sections when all their keys are commented', () => {
+    const result = validateConfig(parseTOML('[layout]\nforce = "compact"\n\n[future]\n# enabled = true\n'));
+    assert.equal(result.valid, true);
   });
 });
 
@@ -85,6 +101,12 @@ describe('validateConfig', () => {
   it('rejects unknown section', () => {
     const result = validateConfig({ unknown: { foo: 1 } });
     assert.equal(result.valid, false);
+  });
+
+  it('still rejects an unknown section when it has active settings', () => {
+    const result = validateConfig(parseTOML('[future]\nenabled = true'));
+    assert.equal(result.valid, false);
+    assert.ok(result.errors.some((e) => e.message.includes('[future]')));
   });
 
   it('rejects non-boolean chip', () => {
@@ -120,5 +142,9 @@ describe('validateConfig', () => {
     assert.equal(validateConfig({ daemon: { enabled: true } }).valid, true);
     assert.equal(validateConfig({ daemon: { enabled: false } }).valid, true);
     assert.equal(validateConfig({ daemon: { enabled: 'yes' } }).valid, false);
+  });
+
+  it('accepts a valid [quota] section', () => {
+    assert.equal(validateConfig({ quota: { enabled: true, refresh_interval_minutes: 1 } }).valid, true);
   });
 });

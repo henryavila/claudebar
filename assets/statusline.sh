@@ -135,7 +135,7 @@ readonly CHIP_PROJECT=${CHIP_PROJECT:-1}
 # quota is polled from the Z.ai monitor API and cached (quota-cache.json, a
 # sibling of this script). QUOTA_ENABLED is the master switch; the interval is
 # the cache TTL in minutes (clamped to a 1-min floor by the fetcher). Ignored
-# entirely on non-GLM setups — the env gate in _glm_quota short-circuits first.
+# entirely on non-GLM setups — the env gate in _glm_active short-circuits first.
 readonly QUOTA_ENABLED=${QUOTA_ENABLED:-1}
 readonly QUOTA_REFRESH_INTERVAL_MINUTES=${QUOTA_REFRESH_INTERVAL_MINUTES:-5}
 
@@ -308,7 +308,7 @@ pip_bar() {
     fi
 
     for ((i=0; i<10; i++)); do
-        if (( marker_active && marker == i )); then
+        if (( marker_active )) && (( marker == i )); then
             # Pipe occupies this cell: gray until the fill reaches it,
             # zone color once consumed (filled > i).
             if (( filled > i )); then
@@ -350,7 +350,7 @@ pip_bar_compact() {
     fi
 
     for ((i=0; i<5; i++)); do
-        if (( marker_active && marker == i )); then
+        if (( marker_active )) && (( marker == i )); then
             if (( filled > i )); then
                 fg "$color" "│"
             else
