@@ -1,8 +1,9 @@
-const VALID_SECTIONS = ['layout', 'chips', 'thresholds', 'colors', 'glyphs', 'update', 'daemon'];
+const VALID_SECTIONS = ['layout', 'chips', 'thresholds', 'colors', 'glyphs', 'update', 'daemon', 'quota'];
 
 const VALID_KEYS = {
   update: ['auto_update', 'auto_update_interval_hours'],
   daemon: ['enabled'],
+  quota: ['enabled', 'refresh_interval_minutes'],
   layout: ['force', 'refresh_interval'],
   chips: ['model', 'effort', 'tmux', 'repo', 'branch', 'worktree', 'dirty', 'pr', 'agent', 'ctx_bar', 'five_hour_bar', 'seven_day_bar', 'countdown', 'time_marker', 'update', 'project'],
   thresholds: ['warning', 'critical'],
@@ -31,12 +32,12 @@ export function parseTOML(content) {
       let val = kvMatch[2].trim();
       val = val.replace(/^["']|["']$/g, '');
 
-      if (section === 'chips' || section === 'daemon') {
+      if (section === 'chips' || section === 'daemon' || (section === 'quota' && key === 'enabled')) {
         config[section][key] = val === 'true';
       } else if (section === 'colors' || section === 'thresholds') {
         const num = Number(val);
         config[section][key] = Number.isFinite(num) ? num : val;
-      } else if (section === 'layout' && key === 'refresh_interval') {
+      } else if ((section === 'layout' && key === 'refresh_interval') || (section === 'quota' && key === 'refresh_interval_minutes')) {
         config[section][key] = Number(val);
       } else if (section === 'update' && key === 'auto_update_interval_hours') {
         config[section][key] = Number(val);
@@ -79,6 +80,18 @@ export function validateConfig(config) {
       if (section === 'chips' || section === 'daemon') {
         if (typeof val !== 'boolean') {
           errors.push({ message: `[${section}] ${key} = ${val} — must be true or false` });
+        }
+      }
+
+      if (section === 'quota' && key === 'enabled') {
+        if (typeof val !== 'boolean') {
+          errors.push({ message: `[quota] enabled = ${val} — must be true or false` });
+        }
+      }
+
+      if (section === 'quota' && key === 'refresh_interval_minutes') {
+        if (typeof val !== 'number' || !Number.isInteger(val) || val < 1) {
+          errors.push({ message: `[quota] refresh_interval_minutes = ${val} — must be an integer >= 1` });
         }
       }
 

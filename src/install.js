@@ -109,6 +109,13 @@ export async function install({ configDir, settingsPath, chooseMode, log, noDaem
   fs.copyFileSync(path.join(__dirname, 'toml-parser.js'), path.join(configDir, 'toml-parser.js'));
   log(`Copied auto-update hook (auto-update.mjs + auto-update.js + toml-parser.js)`);
 
+  // GLM quota payload: the detached refresh entry + its logic module. Copying
+  // quota.js next to the .mjs lets it import from the install dir. statusline.sh
+  // spawns this when the quota cache is stale on a GLM Coding Plan setup.
+  fs.copyFileSync(path.join(ASSETS_DIR, 'quota-fetch.mjs'), path.join(configDir, 'quota-fetch.mjs'));
+  fs.copyFileSync(path.join(__dirname, 'quota.js'), path.join(configDir, 'quota.js'));
+  log(`Copied GLM quota refresh (quota-fetch.mjs + quota.js)`);
+
   const configToml = path.join(configDir, 'config.toml');
   if (!fs.existsSync(configToml)) {
     const defaultConfig = path.join(ASSETS_DIR, 'default-config.toml');
