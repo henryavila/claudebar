@@ -1,5 +1,15 @@
 # Changelog
 
+## v1.6.0 — 2026-06-25
+
+### New: GLM Coding Plan 5-hour quota monitoring
+
+claudebar now supports Claude Code sessions routed through GLM endpoints (`api.z.ai`, `open.bigmodel.cn`, or `dev.bigmodel.cn`). Those sessions do not expose Anthropic-style `.rate_limits.five_hour` data, so the `5h` chip previously stayed empty even when GLM quota information was available elsewhere.
+
+The statusline now detects GLM from `ANTHROPIC_BASE_URL` + `ANTHROPIC_AUTH_TOKEN`, reads a local `quota-cache.json`, and refreshes it in a detached background process via the Z.ai monitor API (`/api/monitor/usage/quota/limit`). The render path never waits on the network, non-GLM sessions never poll, and concurrent renders are de-bounced with a lockfile. Configure it with `[quota] enabled` and `[quota] refresh_interval_minutes` (default 5, minimum 1).
+
+Reinstalling over an older config now back-fills newly shipped config sections and keys from `default-config.toml` without overwriting user settings or explicit opt-outs, so `[quota]` and future defaults show up in existing installs. The TOML parser also ignores comment-only future sections, while still rejecting unknown sections that contain active settings.
+
 ## v1.5.1 — 2026-06-19
 
 ### Fix: the "update available" chip no longer lingers after you're up to date

@@ -89,3 +89,12 @@
 # Default: on. Set to false to opt out — `uninstall` removes any registered
 # daemon, and `install --no-daemon` skips registering it.
 # enabled = true
+
+[quota]
+# GLM Coding Plan 5h/7d usage chips. ONLY active when Claude Code is pointed at
+# a GLM endpoint (api.z.ai / open.bigmodel.cn) — claudebar polls the Z.ai monitor
+# API for the 5-hour token quota from the statusline render path and caches it.
+# This never runs for Anthropic users and never runs with the terminal closed.
+# enabled = true
+# Cache refresh interval, in minutes. Default 5, minimum 1.
+# refresh_interval_minutes = 5

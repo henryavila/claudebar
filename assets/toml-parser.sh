@@ -45,6 +45,17 @@ compile_config() {
                     ;;
                 layout) printf 'LAYOUT_%s=%s\n' "$upper_key" "$val" ;;
                 glyphs) printf 'GLYPH_%s=%s\n' "$upper_key" "$val" ;;
+                quota)
+                    case "$key" in
+                        enabled)
+                            case "$val" in
+                                true) val=1 ;; false) val=0 ;;
+                            esac
+                            printf 'QUOTA_ENABLED=%s\n' "$val"
+                            ;;
+                        refresh_interval_minutes) printf 'QUOTA_REFRESH_INTERVAL_MINUTES=%s\n' "$val" ;;
+                    esac
+                    ;;
             esac
         fi
     done < "$file"

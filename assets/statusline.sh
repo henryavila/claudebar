@@ -26,6 +26,9 @@ _CB_UPDATE_FILE="${CLAUDEBAR_UPDATE_FILE:-$_CB_SCRIPT_DIR/.update-available}"
 # against .update-available so a notification that's already been satisfied does
 # not linger as a phantom alert. Overridable for tests.
 _CB_VERSION_FILE="${CLAUDEBAR_VERSION_FILE:-$_CB_SCRIPT_DIR/.version}"
+# GLM quota cache (Option C). Overridable for tests; defaults to a sibling of
+# this script (the install dir, ~/.config/claudebar/).
+_CB_QUOTA_CACHE="${CLAUDEBAR_QUOTA_CACHE:-$_CB_SCRIPT_DIR/quota-cache.json}"
 
 if [[ -f "$_CB_CONFIG_TOML" ]]; then
     _CB_CONFIG_SH="$_CB_SCRIPT_DIR/config.sh"
@@ -127,6 +130,15 @@ readonly CHIP_TIME_MARKER=${CHIP_TIME_MARKER:-1}
 readonly CHIP_UPDATE=${CHIP_UPDATE:-1}
 readonly CHIP_PROJECT=${CHIP_PROJECT:-1}
 
+# ─── GLM quota polling (Option C) — only active on a GLM endpoint ─────
+# When Claude Code is pointed at api.z.ai / open.bigmodel.cn, the 5-hour token
+# quota is polled from the Z.ai monitor API and cached (quota-cache.json, a
+# sibling of this script). QUOTA_ENABLED is the master switch; the interval is
+# the cache TTL in minutes (clamped to a 1-min floor by the fetcher). Ignored
+# entirely on non-GLM setups — the env gate in _glm_active short-circuits first.
+readonly QUOTA_ENABLED=${QUOTA_ENABLED:-1}
+readonly QUOTA_REFRESH_INTERVAL_MINUTES=${QUOTA_REFRESH_INTERVAL_MINUTES:-5}
+
 # ─── ANSI helpers ──────────────────────────────────────────────────────
 esc=$'\033'
 fg() { printf '%s[38;5;%dm%s%s[0m' "$esc" "$1" "$2" "$esc"; }
@@ -152,6 +164,54 @@ now_epoch() {
         return
     fi
     date +%s
+}
+
+# ─── GLM quota cache (Option C) ───────────────────────────────────────
+# Claude Code injects ANTHROPIC_BASE_URL + ANTHROPIC_AUTH_TOKEN into the
+# statusline subprocess. _glm_active is the cheap gate — everything past it
+# (cache read, detached network refresh) only runs on a GLM Coding Plan setup,
+# so Anthropic users pay one string test and zero network. QUOTA_ENABLED is the
+# master switch from config.toml [quota].
+_glm_active() {
+    (( ${QUOTA_ENABLED:-0} )) || return 1
+    [[ -n "${ANTHROPIC_AUTH_TOKEN:-}" ]] || return 1
+    local base=${ANTHROPIC_BASE_URL:-}
+    [[ "$base" == *z.ai* || "$base" == *bigmodel.cn* ]] || return 1
+    return 0
+}
+
+# Read the cached 5h % from $1 (quota-cache.json); spawn a DETACHED refresh
+# ($2 = quota-fetch.mjs) when the cache is older than $3 minutes and no fetch is
+# already in flight. Prints the % (0-100) or nothing. Never blocks the render:
+# the refresh runs backgrounded and writes the NEXT render's cache. The lock file
+# ($1.lock) carries the spawn epoch (ms) so a burst of renders de-bounces, and a
+# crashed fetcher self-heals once the lock ages past the TTL. Cache-miss → the
+# whole block (read + spawn) is skipped, so there's never a spawn without a cache.
+glm_quota() {
+    local cache=$1 fetcher=$2 ttl=${3:-5}
+    local pct="" fetched=0 now_ms lock lock_ts
+    now_ms=$(( $(now_epoch) * 1000 ))
+    if [[ -f "$cache" ]]; then
+        pct=$(jq -r '.fiveHourPct // empty' "$cache" 2>/dev/null)
+        fetched=$(jq -r '.fetchedAt // 0' "$cache" 2>/dev/null)
+        fetched=${fetched//[^0-9]/}; fetched=${fetched:-0}
+    fi
+    # Spawn a detached refresh when there's no usable cache yet OR it's stale.
+    # The cache-miss arm is what BOOTSTRAPS a fresh install: first render has no
+    # cache → spawn → the next render reads it. (main() already guaranteed jq.)
+    if (( fetched <= 0 || now_ms - fetched >= ttl * 60000 )); then
+        lock="${cache}.lock"
+        lock_ts=0
+        [[ -f "$lock" ]] && { lock_ts=$(cat "$lock" 2>/dev/null); lock_ts=${lock_ts//[^0-9]/}; lock_ts=${lock_ts:-0}; }
+        # De-bounce: spawn only if no recent in-flight fetch (lock empty or aged
+        # past TTL). The subshell is backgrounded; statusline has no tty, so the
+        # child survives parent exit and removes the lock on completion.
+        if (( lock_ts <= 0 || now_ms - lock_ts >= ttl * 60000 )) && have node && [[ -f "$fetcher" ]]; then
+            printf '%s' "$now_ms" > "$lock" 2>/dev/null || true
+            ( node "$fetcher" >/dev/null 2>&1; rm -f "$lock" 2>/dev/null ) &
+        fi
+    fi
+    printf '%s' "$pct"
 }
 
 # ─── _is_mosh_session — walk process tree for mosh-server ancestor ────
@@ -248,7 +308,7 @@ pip_bar() {
     fi
 
     for ((i=0; i<10; i++)); do
-        if (( marker_active && marker == i )); then
+        if (( marker_active )) && (( marker == i )); then
             # Pipe occupies this cell: gray until the fill reaches it,
             # zone color once consumed (filled > i).
             if (( filled > i )); then
@@ -290,7 +350,7 @@ pip_bar_compact() {
     fi
 
     for ((i=0; i<5; i++)); do
-        if (( marker_active && marker == i )); then
+        if (( marker_active )) && (( marker == i )); then
             if (( filled > i )); then
                 fg "$color" "│"
             else
@@ -996,6 +1056,16 @@ main() {
     local GIT_ROOT=""
     if (( CHIP_PROJECT )) && [[ -n "$CWD" ]]; then
         GIT_ROOT=$(resolve_git_root "$CWD") || GIT_ROOT=""
+    fi
+
+    # GLM Coding Plan fallback: when Claude Code reports no Anthropic rate-limit
+    # (it doesn't on a GLM endpoint — .rate_limits.five_hour is empty), source
+    # the 5h % from the Z.ai monitor cache instead. The detached refresh keeps
+    # the cache fresh for the next render; this render reads whatever's cached.
+    # Pure no-op on Anthropic setups (_glm_active short-circuits). Falls back to
+    # the cast below, so the chip renders through the exact same path either way.
+    if [[ -z "$FIVE_HOUR" ]] && _glm_active; then
+        FIVE_HOUR=$(glm_quota "$_CB_QUOTA_CACHE" "${_CB_SCRIPT_DIR}/quota-fetch.mjs" "$QUOTA_REFRESH_INTERVAL_MINUTES")
     fi
 
     # Cast FIVE_HOUR / SEVEN_DAY (jq emits floats like "23.5") to int

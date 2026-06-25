@@ -46,6 +46,9 @@ export async function update({ configDir, settingsPath, log, registerDaemon } = 
   fs.copyFileSync(path.join(ASSETS_DIR, 'auto-update.mjs'), path.join(configDir, 'auto-update.mjs'));
   fs.copyFileSync(path.join(__dirname, 'auto-update.js'), path.join(configDir, 'auto-update.js'));
   fs.copyFileSync(path.join(__dirname, 'toml-parser.js'), path.join(configDir, 'toml-parser.js'));
+  // GLM quota payload back-fills on every update (before the version gate).
+  fs.copyFileSync(path.join(ASSETS_DIR, 'quota-fetch.mjs'), path.join(configDir, 'quota-fetch.mjs'));
+  fs.copyFileSync(path.join(__dirname, 'quota.js'), path.join(configDir, 'quota.js'));
   const settings = readSettings(settingsPath);
   if (settings) {
     const { changed: slRestored } = ensureStatusLine(settings);

@@ -38,5 +38,12 @@ export function compileConfig(config) {
     }
   }
 
+  if (config.quota) {
+    for (const [key, val] of Object.entries(config.quota)) {
+      if (key === 'enabled') lines.push(`QUOTA_ENABLED=${val ? 1 : 0}`);
+      else if (key === 'refresh_interval_minutes') lines.push(`QUOTA_REFRESH_INTERVAL_MINUTES=${val}`);
+    }
+  }
+
   return lines.join('\n') + (lines.length ? '\n' : '');
 }

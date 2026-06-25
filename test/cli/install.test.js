@@ -63,6 +63,92 @@ describe('install', () => {
     assert.equal(content, 'my custom config');
   });
 
+  it('back-fills new default sections on reinstall without clobbering user settings', async () => {
+    fs.mkdirSync(configDir, { recursive: true });
+    fs.writeFileSync(
+      path.join(configDir, 'config.toml'),
+      [
+        '# claudebar config v1',
+        '',
+        '[layout]',
+        'force = "compact"',
+        '',
+        '[chips]',
+        'model = false',
+        '',
+        '[thresholds]',
+        'warning = 55',
+        'critical = 90',
+        '',
+        '[colors]',
+        'model = 99',
+        '',
+        '[glyphs]',
+        'sparkle = "*"',
+        '',
+        '[update]',
+        '# auto_update = "patch"',
+        '',
+      ].join('\n')
+    );
+
+    await install({ configDir, settingsPath, chooseMode: async () => null, log: () => {} });
+
+    const content = fs.readFileSync(path.join(configDir, 'config.toml'), 'utf8');
+    assert.match(content, /\[daemon\]/, 'daemon defaults added');
+    assert.match(content, /\[quota\]/, 'quota defaults added');
+    assert.match(content, /force = "compact"/, 'existing layout setting preserved');
+    assert.match(content, /model = false/, 'existing chip setting preserved');
+
+    const cfg = parseTOML(content);
+    assert.equal(cfg.layout.force, 'compact');
+    assert.equal(cfg.chips.model, false);
+    assert.equal(cfg.daemon, undefined, 'comment-only daemon defaults do not become active settings');
+    assert.equal(cfg.quota, undefined, 'comment-only quota defaults do not become active settings');
+  });
+
+  it('does not duplicate back-filled sections on repeated reinstall', async () => {
+    fs.mkdirSync(configDir, { recursive: true });
+    fs.writeFileSync(path.join(configDir, 'config.toml'), '# claudebar config v1\n\n[layout]\nforce = "full"\n');
+
+    await install({ configDir, settingsPath, chooseMode: async () => null, log: () => {} });
+    await install({ configDir, settingsPath, chooseMode: async () => null, log: () => {} });
+
+    const content = fs.readFileSync(path.join(configDir, 'config.toml'), 'utf8');
+    assert.equal((content.match(/^\[daemon\]$/gm) ?? []).length, 1);
+    assert.equal((content.match(/^\[quota\]$/gm) ?? []).length, 1);
+  });
+
+  it('back-fills missing keys inside existing default sections without overwriting explicit opt-outs', async () => {
+    fs.mkdirSync(configDir, { recursive: true });
+    fs.writeFileSync(
+      path.join(configDir, 'config.toml'),
+      [
+        '# claudebar config v1',
+        '',
+        '[daemon]',
+        'enabled = false',
+        '',
+        '[quota]',
+        'enabled = false',
+        '',
+      ].join('\n')
+    );
+
+    await install({ configDir, settingsPath, log: () => {} });
+
+    const content = fs.readFileSync(path.join(configDir, 'config.toml'), 'utf8');
+    assert.match(content, /enabled = false/, 'explicit opt-out preserved');
+    assert.match(content, /# refresh_interval_minutes = 5/, 'missing quota interval template key added');
+    assert.equal((content.match(/^\[daemon\]$/gm) ?? []).length, 1);
+    assert.equal((content.match(/^\[quota\]$/gm) ?? []).length, 1);
+
+    const cfg = parseTOML(content);
+    assert.equal(cfg.daemon.enabled, false);
+    assert.equal(cfg.quota.enabled, false);
+    assert.equal(daemonCalls.length, 0, 'daemon opt-out still honored');
+  });
+
   it('writes .version file', async () => {
     await install({ configDir, settingsPath, log: () => {} });
     assert.ok(fs.existsSync(path.join(configDir, '.version')));
